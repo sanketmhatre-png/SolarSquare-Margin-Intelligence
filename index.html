@@ -306,7 +306,6 @@ tr:hover td{background:#fafbfc}
 <body>
 
 
-
 <div class="hdr">
   <div class="hdr-brand">
     <div class="hdr-logo" style="background:none;box-shadow:none;padding:0">
@@ -392,7 +391,6 @@ tr:hover td{background:#fafbfc}
       <div class="load-step" id="ls-Booking"><span class="load-step-icon">⏳</span>Booking sheet (costs &amp; targets)</div>
       <div class="load-step" id="ls-BOM"><span class="load-step-icon">⏳</span>BOM sheet (design estimates)</div>
       <div class="load-step" id="ls-GRN"><span class="load-step-icon">⏳</span>GRN sheet (actual install costs)</div>
-      <div class="load-step" id="ls-Install opex"><span class="load-step-icon">⏳</span>Install OPEX sheet</div>
       <div class="load-step" id="ls-Process"><span class="load-step-icon">⏳</span>Computing margins…</div>
     </div>
   </div>
@@ -629,12 +627,10 @@ tr:hover td{background:#fafbfc}
               <th onclick="sortBy('kwp')" data-col="kwp" class="t-r">KWp</th>
               <th onclick="sortBy('revenue')" data-col="revenue" class="t-r">Revenue</th>
               <th onclick="sortBy('bkGM')" data-col="bkGM" class="t-r">📋 Bk-GM%</th>
-              <th onclick="sortBy('bkNM')" data-col="bkNM" class="t-r">📋 Bk-NM%</th>
               <th onclick="sortBy('bkGMabs')" data-col="bkGMabs" class="t-r">Bk-GM ₹</th>
               <th onclick="sortBy('deGM')" data-col="deGM" class="t-r">📐 De-GM%</th>
               <th onclick="sortBy('deGMabs')" data-col="deGMabs" class="t-r">De-GM ₹</th>
               <th onclick="sortBy('instGM')" data-col="instGM" class="t-r">🔧 In-GM%</th>
-              <th onclick="sortBy('insNM')" data-col="insNM" class="t-r">🔧 In-NM%</th>
               <th onclick="sortBy('insGMabs')" data-col="insGMabs" class="t-r">In-GM ₹</th>
               <th onclick="sortBy('dBkDe')" data-col="dBkDe" class="t-r">Δ Bk→De</th>
               <th onclick="sortBy('dDeIn')" data-col="dDeIn" class="t-r">Δ De→In</th>
@@ -877,11 +873,11 @@ function fetchSheet(name){
     const cb='_gs'+(Date.now()+'').slice(-6)+(Math.random()*9999|0);
     const script=document.createElement('script');
 
-    // 8s timeout — falls back to demo data quickly if network is blocked
+    // 60s timeout (GRN sheet can be large)
     const timer=setTimeout(()=>{
       cleanup();
-      reject(new Error(`Timeout — "${name}" sheet unreachable (network blocked or sheet not published)`));
-    }, 8000);
+      reject(new Error(`Timeout (60s) — "${name}" sheet may be very large or sheet is not published`));
+    }, 60000);
 
     function cleanup(){
       clearTimeout(timer);
@@ -976,7 +972,7 @@ function mapBK(part){
 // ═══════════════════════════════════════════
 // DATA PROCESSING
 // ═══════════════════════════════════════════
-function processData(rev,booking,bom,grn,installOpex){
+function processData(rev,booking,bom,grn){
   const revMap={};
   // ── Detect Installation Month column — brute-force score every column
   let installMonthCol=null;
@@ -1120,27 +1116,15 @@ function processData(rev,booking,bom,grn,installOpex){
     window._bomLineData.push({sseid:id,particular,rawCat,mappedCat,amt,kwp:revMap[id].kwp});
   });
 
-  // Helper — find value tolerantly across possible column name variants
-  const getSSEID=r=>( r.SSEID||r.sseid||r['SSE ID']||r['Sse Id']||r['SSHE ID']||r['Project ID']||'' ).trim();
-  const getAmt=r=>num( r.Amount||r.amount||r.AMOUNT||r['Amount (₹)']||r['Amt']||r.amt||0 );
-
-  // Debug: log actual column names from each sheet so mismatches are visible
-  if(grn.length)       console.log('[DEBUG] GRN columns:',        Object.keys(grn[0]));
-  if(installOpex.length) console.log('[DEBUG] Install opex columns:', Object.keys(installOpex[0]));
-  if(bom.length)       console.log('[DEBUG] BOM columns:',        Object.keys(bom[0]));
-  if(booking.length)   console.log('[DEBUG] Booking columns:',    Object.keys(booking[0]));
-
-  // GRN = pure COGS (Install OPEX comes from its own sheet)
   grn.forEach(r=>{
-    const id=getSSEID(r);if(!id||!revMap[id])return;
-    if(!grnMap[id])grnMap[id]=0;
-    if(!grnCatMap[id])grnCatMap[id]={};
-    const amt=getAmt(r);
+    const id=(r.SSEID||'').trim();if(!id||!revMap[id])return;
+    if(!grnMap[id])grnMap[id]=0;if(!grnCatMap[id])grnCatMap[id]={};
+    const amt=num(r.Amount||0);
     const rawCat=(r.Category||r.Particulars||'').toString().trim().toUpperCase()||'OTHER';
     const cat=mapBG(r.Category||r.Particulars||'');
+    // SKU = Particulars (more specific than Category)
     const sku=(r.Particulars||r.Description||r.Item||r.PARTICULAR||'').toString().trim().toUpperCase()||rawCat;
-    grnMap[id]+=amt;
-    grnCatMap[id][cat]=(grnCatMap[id][cat]||0)+amt;
+    grnMap[id]+=amt;grnCatMap[id][cat]=(grnCatMap[id][cat]||0)+amt;
     catTotals[cat]=(catTotals[cat]||0)+amt;
     if(!window._rawGrnByCat[id])window._rawGrnByCat[id]={};
     window._rawGrnByCat[id][rawCat]=(window._rawGrnByCat[id][rawCat]||0)+amt;
@@ -1152,15 +1136,6 @@ function processData(rev,booking,bom,grn,installOpex){
       grnByMonth[ym].add(id);
     }
   });
-
-  // ── Install OPEX sheet — sum Amount per SSEID
-  const insOpexMap={};
-  installOpex.forEach(r=>{
-    const id=getSSEID(r);if(!id||!revMap[id])return;
-    const amt=getAmt(r);
-    insOpexMap[id]=(insOpexMap[id]||0)+amt;
-  });
-  console.log(`[DEBUG] Install OPEX: ${installOpex.length} rows, ${Object.keys(insOpexMap).length} projects matched, total ₹${Object.values(insOpexMap).reduce((s,v)=>s+v,0).toLocaleString()}`);
   catCosts=catTotals;
   // Build sorted availableMonths — prefer Revenue "Installation Month", fallback to GRN dates
   const monthSource=Object.keys(projByInstallMonth).length>0
@@ -1179,16 +1154,14 @@ function processData(rev,booking,bom,grn,installOpex){
   Object.keys(revMap).forEach(id=>{
     const rd=revMap[id];
     const bk=bkMap[id]||{cogs:0,opex:0};
-    const de=bomMap[id]||0;const ins=grnMap[id]||0;const insOpex=insOpexMap[id]||0;const rv=rd.revenue;
+    const de=bomMap[id]||0;const ins=grnMap[id]||0;const rv=rd.revenue;
     if(!rv)return;
     projCatData[id]={bk:bkCatMap[id]||{},bm:bomCatMap[id]||{},gn:grnCatMap[id]||{},
-      revenue:rv,bkCOGS:bk.cogs,bkOPEX:bk.opex,insOPEX:insOpex};
-    // Booking NM  = (Rev - Booking COGS - Booking OPEX) / Rev
+      revenue:rv,bkCOGS:bk.cogs,bkOPEX:bk.opex};
     const bkGM=(rv-bk.cogs)/rv,bkNM=(rv-bk.cogs-bk.opex)/rv;
     const deGM=de>0?(rv-de)/rv:null;
     const insGM=ins>0?(rv-ins)/rv:null;
-    // Install NM  = (Rev - Install COGS - Install OPEX) / Rev
-    const insNM=ins>0?(rv-ins-insOpex)/rv:null;
+    const insNM=ins>0?(rv-ins-bk.opex)/rv:null;
     // Use pre-calculated TAT from Column M
     const _tatNum=rd.tatRaw!==''?Math.round(parseFloat(rd.tatRaw.replace(/[^0-9.\-]/g,''))):NaN;
     const tatDays=(!isNaN(_tatNum)&&_tatNum>0)?_tatNum:null;
@@ -1196,7 +1169,7 @@ function processData(rev,booking,bom,grn,installOpex){
       city:rd.city||'Unknown', sizeBracket:rd.sizeBracket||'Unknown', revenueType:rd.revenueType||'Unknown', installType:rd.installType||'Unknown',
       bookingDate:rd.bookingDate||'', installDate:rd.installDate||'', tatDays,
       sheetFY:rd.sheetFY||'', sheetQ:rd.sheetQ||'',
-      bkCOGS:bk.cogs,bkOPEX:bk.opex,insOPEX:insOpex,desCost:de,insCost:ins,
+      bkCOGS:bk.cogs,bkOPEX:bk.opex,desCost:de,insCost:ins,
       bkGM,bkNM,deGM,insGM,insNM,compress:insNM!=null?bkNM-insNM:null});
   });
   return result.sort((a,b)=>b.revenue-a.revenue);
@@ -1212,21 +1185,19 @@ function getCatData(id){
   if(id!=='__portfolio__'){
     const p=list[0];const cd=projCatData[p.id];
     if(!cd||!p)return null;
-    return{bk:cd.bk,bm:cd.bm,gn:cd.gn,revenue:p.revenue,bkCOGS:p.bkCOGS,bkOPEX:p.bkOPEX,insOPEX:p.insOPEX||0};
+    return{bk:cd.bk,bm:cd.bm,gn:cd.gn,revenue:p.revenue,bkCOGS:p.bkCOGS,bkOPEX:p.bkOPEX};
   }
   let bk={},bm={},gn={},totalRev=0,totalBkCOGS=0,totalBkOPEX=0;
-  let totalInsOPEX=0;
   list.forEach(p=>{
     const cd=projCatData[p.id];if(!cd)return;
     totalRev+=p.revenue;totalBkCOGS+=p.bkCOGS;totalBkOPEX+=p.bkOPEX;
-    totalInsOPEX+=(p.insOPEX||0);
     [...STD_CATS,'Others'].forEach(cat=>{
       bk[cat]=(bk[cat]||0)+(cd.bk[cat]||0);
       bm[cat]=(bm[cat]||0)+(cd.bm[cat]||0);
       gn[cat]=(gn[cat]||0)+(cd.gn[cat]||0);
     });
   });
-  return{bk,bm,gn,revenue:totalRev,bkCOGS:totalBkCOGS,bkOPEX:totalBkOPEX,insOPEX:totalInsOPEX};
+  return{bk,bm,gn,revenue:totalRev,bkCOGS:totalBkCOGS,bkOPEX:totalBkOPEX};
 }
 
 // Category cost totals for the currently filtered set (used by donut)
@@ -1254,8 +1225,7 @@ function renderJourney(id){
   const deGM=desCost>0?(rv-desCost)/rv:null;
   const deNM=desCost>0?(rv-desCost-cd.bkOPEX)/rv:null;
   const insGM=insCost>0?(rv-insCost)/rv:null;
-  // Install NM uses its own OPEX from GRN sheet
-  const insNM=insCost>0?(rv-insCost-(cd.insOPEX||0))/rv:null;
+  const insNM=insCost>0?(rv-insCost-cd.bkOPEX)/rv:null;
   const d1=deGM!=null?deGM-bkGM:null;
   const d2=insGM!=null&&deGM!=null?insGM-deGM:insGM!=null?insGM-bkGM:null;
 
@@ -2002,8 +1972,6 @@ function renderTable(){
       insGMabs:[a.insGM!=null?a.revenue-a.insCost:0,b.insGM!=null?b.revenue-b.insCost:0],
       dBkDe:[dBkDeA,dBkDeB],dDeIn:[dDeInA,dDeInB],
       tat:[a.tatDays||0,b.tatDays||0],
-      bkNM:[a.bkNM||0,b.bkNM||0],
-      insNM:[a.insNM||0,b.insNM||0],
       name:[a.name,b.name]}[sortCol]||[a.revenue,b.revenue];
     return typeof v[0]==='string'?sortDir*v[0].localeCompare(v[1]):sortDir*(v[0]-v[1]);
   });
@@ -2025,12 +1993,10 @@ function renderTable(){
       <td class="t-r">${p.kwp.toFixed(1)}</td>
       <td class="t-r">${fmt(p.revenue)}</td>
       <td class="t-r">${mc(p.bkGM,'#3b82f6')}</td>
-      <td class="t-r">${mc(p.bkNM,'#8b5cf6')}</td>
       <td class="t-r">${fmtAbs(bkGMabs)}</td>
       <td class="t-r">${p.deGM!=null?mc(p.deGM,'#f59e0b'):'<span style="color:#94a3b8;font-size:11px">No BOM</span>'}</td>
       <td class="t-r">${p.deGM!=null?fmtAbs(deGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
       <td class="t-r">${p.insGM!=null?mc(p.insGM,'#22c55e'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
-      <td class="t-r">${p.insNM!=null?mc(p.insNM,'#10b981'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
       <td class="t-r">${p.insGM!=null?fmtAbs(insGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
       <td class="t-r">${dHtml(dBkDe)}</td>
       <td class="t-r">${dHtml(dDeIn)}</td>
@@ -2125,8 +2091,7 @@ function openDetail(idx){
     {l:'Booking COGS',v:fmt(p.bkCOGS),s:`GM: ${(p.bkGM*100).toFixed(1)}%`,c:'#3b82f6'},
     {l:'Booking OPEX',v:fmt(p.bkOPEX),s:`NM: ${(p.bkNM*100).toFixed(1)}%`,c:'#8b5cf6'},
     {l:'Design (BOM)',v:p.desCost>0?fmt(p.desCost):'No data',s:p.deGM!=null?`GM: ${(p.deGM*100).toFixed(1)}%`:'—',c:'#f59e0b'},
-    {l:'Install COGS (GRN)',v:p.insCost>0?fmt(p.insCost):'Pending',s:p.insGM!=null?`GM: ${(p.insGM*100).toFixed(1)}%`:'—',c:'#22c55e'},
-    {l:'Install OPEX',v:p.insOPEX>0?fmt(p.insOPEX):'—',s:p.insNM!=null?`NM: ${(p.insNM*100).toFixed(1)}%`:'—',c:'#10b981'},
+    {l:'Install (GRN)',v:p.insCost>0?fmt(p.insCost):'Pending',s:p.insGM!=null?`GM: ${(p.insGM*100).toFixed(1)}%`:'—',c:'#22c55e'},
     {l:'NM Compression',v:p.compress!=null?pp(p.compress):'—',
       s:p.compress!=null?(p.compress>0.05?'⚠ Overrun':p.compress<0?'✓ Under budget':'Within range'):'—',
       c:p.compress>0.05?'#dc2626':p.compress<0?'#16a34a':'#64748b'},
@@ -2160,21 +2125,6 @@ async function loadData(){
   document.getElementById('loadingState').style.display='flex';
   document.getElementById('appContent').style.display='none';
   document.getElementById('errState').style.display='none';
-
-  // ── Detect offline / sandboxed preview environments (no external network)
-  const isOffline = !navigator.onLine ||
-    location.protocol==='blob:' ||
-    (location.hostname==='' || location.hostname==='localhost' || location.hostname==='127.0.0.1');
-
-  if(isOffline){
-    status.textContent='⚠ Demo data (offline / preview mode)';
-    document.getElementById('loadingState').style.display='none';
-    document.getElementById('appContent').style.display='block';
-    btn.disabled=false; btn.textContent='🔄 Refresh';
-    loadDemoData();
-    return;
-  }
-
   status.textContent='Connecting to Google Sheets…';
 
   // Reset all step indicators
@@ -2183,13 +2133,12 @@ async function loadData(){
     Booking:'Booking sheet (costs & targets)',
     BOM:'BOM sheet (design estimates)',
     GRN:'GRN sheet (actual install costs)',
-    'Install opex':'Install OPEX sheet',
     Process:'Computing margins…'
   };
   Object.keys(stepLabels).forEach(k=>setStep(k,'pending',stepLabels[k]));
 
   const sheets={};
-  const sheetKeys=['Revenue','Booking','BOM','GRN','Install opex'];
+  const sheetKeys=['Revenue','Booking','BOM','GRN'];
   let anyFailed=false,errMsgs=[];
 
   for(const key of sheetKeys){
@@ -2229,8 +2178,7 @@ async function loadData(){
       sheets.Revenue,
       sheets.Booking,
       sheets.BOM||[],
-      sheets.GRN||[],
-      sheets['Install opex']||[]
+      sheets.GRN||[]
     );
     if(!projects.length) throw new Error('No matching project data (check SSEID values in Revenue sheet)');
 
@@ -3320,19 +3268,15 @@ function doExport(){
 // ═══════════════════════════════════════════
 // DEMO DATA
 // ═══════════════════════════════════════════
-function mkp(id,name,kwp,rev,opxR,bk,bm,gn,insOpxR){
+function mkp(id,name,kwp,rev,opxR,bk,bm,gn){
   const bkCOGS=Object.values(bk).reduce((s,v)=>s+v,0);
   const bkOPEX=rev*opxR;
   const desCost=Object.values(bm).reduce((s,v)=>s+v,0);
   const insCost=Object.values(gn).reduce((s,v)=>s+v,0);
-  // Install OPEX — use its own rate (defaults to booking rate if not supplied)
-  const insOPEX=rev*(insOpxR!=null?insOpxR:opxR);
-  projCatData[id]={bk,bm,gn,revenue:rev,bkCOGS,bkOPEX,insOPEX};
-  // Booking NM = (Rev - Booking COGS - Booking OPEX) / Rev
+  projCatData[id]={bk,bm,gn,revenue:rev,bkCOGS,bkOPEX};
   const bkGM=(rev-bkCOGS)/rev,bkNM=(rev-bkCOGS-bkOPEX)/rev;
-  // Install NM = (Rev - Install COGS - Install OPEX) / Rev
-  const insNM=(rev-insCost-insOPEX)/rev;
-  return{id,name,kwp,revenue:rev,bkCOGS,bkOPEX,insOPEX,desCost,insCost,
+  const insNM=(rev-insCost-bkOPEX)/rev;
+  return{id,name,kwp,revenue:rev,bkCOGS,bkOPEX,desCost,insCost,
     bkGM,bkNM,deGM:(rev-desCost)/rev,insGM:(rev-insCost)/rev,insNM,
     compress:bkNM-insNM};
 }
