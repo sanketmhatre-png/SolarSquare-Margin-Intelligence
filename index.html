@@ -629,10 +629,12 @@ tr:hover td{background:#fafbfc}
               <th onclick="sortBy('revenue')" data-col="revenue" class="t-r">Revenue</th>
               <th onclick="sortBy('bkGM')" data-col="bkGM" class="t-r">📋 Bk-GM%</th>
               <th onclick="sortBy('bkGMabs')" data-col="bkGMabs" class="t-r">Bk-GM ₹</th>
+              <th onclick="sortBy('bkNM')" data-col="bkNM" class="t-r">📋 Bk-NM%</th>
               <th onclick="sortBy('deGM')" data-col="deGM" class="t-r">📐 De-GM%</th>
               <th onclick="sortBy('deGMabs')" data-col="deGMabs" class="t-r">De-GM ₹</th>
               <th onclick="sortBy('instGM')" data-col="instGM" class="t-r">🔧 In-GM%</th>
               <th onclick="sortBy('insGMabs')" data-col="insGMabs" class="t-r">In-GM ₹</th>
+              <th onclick="sortBy('insNM')" data-col="insNM" class="t-r">🔧 In-NM%</th>
               <th onclick="sortBy('dBkDe')" data-col="dBkDe" class="t-r">Δ Bk→De</th>
               <th onclick="sortBy('dDeIn')" data-col="dDeIn" class="t-r">Δ De→In</th>
               <th onclick="sortBy('tat')" data-col="tat" class="t-r">⏱ TAT</th>
@@ -2002,6 +2004,8 @@ function renderTable(){
     const v={revenue:[a.revenue,b.revenue],kwp:[a.kwp,b.kwp],
       bkGM:[a.bkGM,b.bkGM],deGM:[a.deGM||0,b.deGM||0],
       instGM:[a.insGM||0,b.insGM||0],
+      bkNM:[a.bkNM||0,b.bkNM||0],
+      insNM:[a.insNM!=null?a.insNM:-9,b.insNM!=null?b.insNM:-9],
       bkGMabs:[a.revenue-a.bkCOGS,b.revenue-b.bkCOGS],
       deGMabs:[a.deGM!=null?a.revenue-a.desCost:0,b.deGM!=null?b.revenue-b.desCost:0],
       insGMabs:[a.insGM!=null?a.revenue-a.insCost:0,b.insGM!=null?b.revenue-b.insCost:0],
@@ -2029,10 +2033,12 @@ function renderTable(){
       <td class="t-r">${fmt(p.revenue)}</td>
       <td class="t-r">${mc(p.bkGM,'#3b82f6')}</td>
       <td class="t-r">${fmtAbs(bkGMabs)}</td>
+      <td class="t-r">${mc(p.bkNM,'#8b5cf6')}</td>
       <td class="t-r">${p.deGM!=null?mc(p.deGM,'#f59e0b'):'<span style="color:#94a3b8;font-size:11px">No BOM</span>'}</td>
       <td class="t-r">${p.deGM!=null?fmtAbs(deGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
       <td class="t-r">${p.insGM!=null?mc(p.insGM,'#22c55e'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
       <td class="t-r">${p.insGM!=null?fmtAbs(insGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
+      <td class="t-r">${p.insNM!=null?mc(p.insNM,'#10b981'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
       <td class="t-r">${dHtml(dBkDe)}</td>
       <td class="t-r">${dHtml(dDeIn)}</td>
       <td class="t-r">${p.tatDays!=null?`<span style="font-weight:700;color:${p.tatDays<=60?'var(--g)':p.tatDays<=90?'#d97706':'var(--r)'}">${p.tatDays}d</span>`:'<span style="color:#94a3b8">—</span>'}</td>
@@ -3240,7 +3246,7 @@ function doExport(){
 
   // ── Sheet 1: Revenue Summary ──────────────────────────────────
   if(_dlSheets.revenue){
-    const hdr=['SSEID','Project Name','KWp','Revenue (₹)','Booking GM%','Booking GM ₹','Design GM%','Design GM ₹','Install GM%','Install GM ₹','Δ Bk→De (pp)','Δ De→In (pp)','TAT (days)','City','Size Bracket','Revenue Type'];
+    const hdr=['SSEID','Project Name','KWp','Revenue (₹)','Booking GM%','Booking GM ₹','Booking NM%','Design GM%','Design GM ₹','Install GM%','Install GM ₹','Install Opex (₹)','Install NM%','Δ Bk→De (pp)','Δ De→In (pp)','TAT (days)','City','Size Bracket','Revenue Type'];
     const rows=projects.filter(p=>selIds.has(p.id)).map(p=>{
       const bkGMabs=p.revenue-p.bkCOGS;
       const deGMabs=p.deGM!=null?p.revenue-p.desCost:null;
@@ -3248,13 +3254,14 @@ function doExport(){
       const dBkDe=p.deGM!=null?+(( p.deGM-p.bkGM)*100).toFixed(2):null;
       const dDeIn=p.insGM!=null&&p.deGM!=null?+((p.insGM-p.deGM)*100).toFixed(2):null;
       return[p.id,p.name,+p.kwp.toFixed(2),p.revenue,
-        +(p.bkGM*100).toFixed(2),bkGMabs,
+        +(p.bkGM*100).toFixed(2),bkGMabs,+(p.bkNM*100).toFixed(2),
         p.deGM!=null?+(p.deGM*100).toFixed(2):null,deGMabs,
         p.insGM!=null?+(p.insGM*100).toFixed(2):null,insGMabs,
+        p.insOpex||0,p.insNM!=null?+(p.insNM*100).toFixed(2):null,
         dBkDe,dDeIn,p.tatDays||null,p.city,p.sizeBracket,p.revenueType];
     });
     const ws=XLSX.utils.aoa_to_sheet([hdr,...rows]);
-    ws['!cols']=[{wch:14},{wch:28},{wch:7},{wch:14},{wch:12},{wch:14},{wch:12},{wch:14},{wch:12},{wch:14},{wch:12},{wch:12},{wch:10},{wch:12},{wch:14},{wch:14}];
+    ws['!cols']=[{wch:14},{wch:28},{wch:7},{wch:14},{wch:12},{wch:14},{wch:12},{wch:12},{wch:14},{wch:12},{wch:14},{wch:14},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:14},{wch:14}];
     XLSX.utils.book_append_sheet(wb,ws,'Revenue Summary');
   }
 
