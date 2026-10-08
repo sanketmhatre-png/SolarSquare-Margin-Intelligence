@@ -88,6 +88,32 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .btn-clear-filter{background:var(--rl);color:var(--r);border:none;padding:5px 12px;
   border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap}
 .btn-clear-filter:hover{background:#fca5a5}
+/* ── KPI CALCULATION POPUP */
+td.kpi-click{cursor:zoom-in;position:relative}
+td.kpi-click:hover{background:#eef6ff!important;box-shadow:inset 0 0 0 1.5px #93c5fd;border-radius:6px}
+.calc-overlay{position:fixed;inset:0;z-index:9100;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;padding:20px}
+.calc-overlay.open{display:flex}
+.calc-box{background:#fff;border-radius:16px;width:860px;max-width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.35)}
+.calc-head{padding:20px 24px 14px;border-bottom:1px solid var(--bdr);display:flex;justify-content:space-between;gap:12px}
+.calc-title{font-size:17px;font-weight:800;color:var(--dark)}
+.calc-sub{font-size:12px;color:var(--textl);margin-top:2px}
+.calc-body{padding:18px 24px 22px;overflow-y:auto}
+.calc-result{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.calc-result .big{font-size:34px;font-weight:900;line-height:1}
+.calc-formula{background:#f8fafc;border:1px solid var(--bdr);border-radius:10px;padding:10px 14px;font-family:Consolas,Menlo,monospace;font-size:12.5px;color:var(--dark);margin-bottom:14px}
+.calc-steps{border:1px solid var(--bdr);border-radius:10px;overflow:hidden;margin-bottom:16px}
+.calc-step{display:flex;justify-content:space-between;padding:8px 14px;font-size:13px;border-bottom:1px solid #f1f5f9}
+.calc-step:last-child{border-bottom:none}
+.calc-step .op{color:var(--textl);width:22px;display:inline-block;font-weight:700}
+.calc-step .src{font-size:11px;color:var(--textl);margin-left:6px}
+.calc-step.total{background:#f8fafc;font-weight:800}
+.calc-step .amt{font-weight:700;font-variant-numeric:tabular-nums}
+.calc-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--textl);margin:16px 0 6px}
+.calc-warn{background:var(--yl);color:#92400e;border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px}
+.calc-scroll{max-height:300px;overflow:auto;border:1px solid var(--bdr);border-radius:8px}
+.calc-scroll table{font-size:12px}
+.calc-scroll th{position:sticky;top:0;background:#f8fafc;cursor:default}
+.calc-scroll td,.calc-scroll th{padding:6px 10px}
 /* ── DOWNLOAD MODAL */
 .dl-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center}
 .dl-overlay.open{display:flex}
@@ -661,6 +687,16 @@ tr:hover td{background:#fafbfc}
 </div>
 
 <!-- ── DOWNLOAD MODAL ── -->
+<div class="calc-overlay" id="calcOverlay" onclick="if(event.target===this)closeCalc()">
+  <div class="calc-box">
+    <div class="calc-head">
+      <div><div class="calc-title" id="calcTitle"></div><div class="calc-sub" id="calcSub"></div></div>
+      <button class="detail-close" onclick="closeCalc()">✕</button>
+    </div>
+    <div class="calc-body" id="calcBody"></div>
+  </div>
+</div>
+
 <div class="dl-overlay" id="dlOverlay" onclick="if(event.target===this)closeDownloadModal()">
   <div class="dl-box">
     <div class="dl-title">📥 Export to Excel</div>
@@ -1073,18 +1109,23 @@ function processData(rev,booking,bom,grn,installOpex){
   });
 
   const bkMap={},bkCatMap={};
+  window._bkOpexLines=[];   // booking opex line items, for detail-panel analysis
   booking.forEach(r=>{
     const id=(r.SSEID||'').trim();if(!id||!revMap[id])return;
     if(!bkMap[id])bkMap[id]={cogs:0,opex:0};
     if(!bkCatMap[id])bkCatMap[id]={};
     const cost=num(r['Booking Cost']||0);
-    const type=(r['Expense Type']||'').toUpperCase();
+    const type=(r['Expense Type']||'').toUpperCase().trim();
     const cat=mapBK(r.Particulars||r.Category||'');
+    const part=(r.Particulars||r.Category||'').toString().trim();
     if(type==='COGS'&&cat!=='__OPEX__'){
       bkMap[id].cogs+=cost;
       bkCatMap[id][cat]=(bkCatMap[id][cat]||0)+cost;
+    }else if(type==='OPEX'||cat==='__OPEX__'){
+      // OPEX rows + COGS-tagged opex particulars (I&C, transport, CAC…) — previously dropped
+      bkMap[id].opex+=cost;
+      if(cost)window._bkOpexLines.push({sseid:id,part,type,amt:cost});
     }
-    if(type==='OPEX')bkMap[id].opex+=cost;
   });
 
   const bomMap={},bomCatMap={};
@@ -1126,7 +1167,7 @@ function processData(rev,booking,bom,grn,installOpex){
     const rawCat=(r.Category||r.Particulars||'').toString().trim().toUpperCase()||'OTHER';
     const particular=(r.Particulars||r.Description||r.Item||r.PARTICULAR||'').toString().trim().toUpperCase()||rawCat;
     const mappedCat=mapBG(r.Category||r.Particulars||'');
-    window._bomLineData.push({sseid:id,particular,rawCat,mappedCat,amt,kwp:revMap[id].kwp});
+    window._bomLineData.push({sseid:id,particular,rawCat,mappedCat,amt,kwp:revMap[id].kwp,item:(r['Item Name']||'').toString().trim(),code:(r['Item Code (Items)']||'').toString().trim(),qty:num(r['Qty (Items)']||0)});
   });
 
   grn.forEach(r=>{
@@ -1143,7 +1184,7 @@ function processData(rev,booking,bom,grn,installOpex){
     window._rawGrnByCat[id][rawCat]=(window._rawGrnByCat[id][rawCat]||0)+amt;
     // ── Build month index from Date column + store SKU record
     const ym=extractYM(r.Date||r.date||'');
-    window._skuData.push({sseid:id,sku,cat:rawCat,amt,kwp:revMap[id].kwp,ym:ym||'unknown'});
+    window._skuData.push({sseid:id,sku,cat:rawCat,mappedCat:cat,amt,kwp:revMap[id].kwp,ym:ym||'unknown',item:(r['Item Name']||'').toString().trim(),code:(r['Item Code (Items)']||'').toString().trim(),qty:num(r['Net Qty']||0),voucher:(r['Voucher #']||'').toString().trim()});
     if(ym){
       if(!grnByMonth[ym])grnByMonth[ym]=new Set();
       grnByMonth[ym].add(id);
@@ -1154,25 +1195,30 @@ function processData(rev,booking,bom,grn,installOpex){
   // ── Install Opex map: sseid → total opex amount (I&C + Labour from Install opex sheet)
   const instOpexMap={};
   window._instOpexLineData=[];
+  // Normalise IDs so "sshs-1571 ", "SSHS_1571" etc. all match
+  const normId=v=>String(v||'').toUpperCase().replace(/\s+/g,'').replace(/-/g,'_');
+  const revByNorm={};Object.keys(revMap).forEach(k=>{revByNorm[normId(k)]=k;});
+  const ioCols=installOpex&&installOpex.length?Object.keys(installOpex[0]):[];
+  const findIO=(...tests)=>ioCols.find(c=>tests.some(t=>t(c.toLowerCase().trim())))||null;
+  const ioProjCol=findIO(c=>c==='project',c=>c==='sseid',c=>c.includes('project'));
+  const ioAmtCol =findIO(c=>c.startsWith('amount (company currency)'),c=>c==='amount',c=>c.includes('amount'));
+  const ioNameCol=findIO(c=>c.startsWith('item name'));
+  const unmatched=new Set();
   (installOpex||[]).forEach(r=>{
-    // Project column is "Project" (SSEID like SSHS_1571)
-    const id=(r.Project||r.SSEID||'').trim();
-    if(!id||!revMap[id])return;
-    // Amount column: gviz truncates long headers — try several variants
-    const amtRaw=r['Amount (Company Currency) (It...']
-      ||r['Amount (Company Currency)']
-      ||r['Amount']
-      // fallback: find first key containing 'Amount' (case-insensitive)
-      ||(Object.entries(r).find(([k])=>k.toLowerCase().includes('amount'))||[])[1]
-      ||0;
-    const amt=num(amtRaw);
+    const raw=ioProjCol?r[ioProjCol]:'';
+    const id=revByNorm[normId(raw)];
+    if(!id){if(raw)unmatched.add(String(raw).trim());return;}
+    const amt=num(ioAmtCol?r[ioAmtCol]:0);
     if(!amt)return;
     instOpexMap[id]=(instOpexMap[id]||0)+amt;
     const cat=(r.Category||r.Type||'I&C').toString().trim();
-    const itemName=(r['Item Name (Items)']||'').toString().trim();
+    const itemName=(ioNameCol?r[ioNameCol]:'').toString().trim();
     window._instOpexLineData.push({sseid:id,itemName,cat,amt,kwp:revMap[id].kwp,date:r.Date||''});
   });
   window._instOpexMap=instOpexMap;
+  window._instOpexCols={project:ioProjCol,amount:ioAmtCol};
+  console.log(`💸 Install opex → project col:"${ioProjCol}" amount col:"${ioAmtCol}" · ${Object.keys(instOpexMap).length} projects matched`);
+  if(unmatched.size)console.warn(`⚠ ${unmatched.size} Install opex project IDs not in Revenue sheet:`,[...unmatched].slice(0,30));
 
   // Build sorted availableMonths — prefer Revenue "Installation Month", fallback to GRN dates
   const monthSource=Object.keys(projByInstallMonth).length>0
@@ -2033,21 +2079,22 @@ function renderTable(){
     const bkGMabs=absGM(p.revenue,p.bkCOGS);
     const deGMabs=p.deGM!=null?absGM(p.revenue,p.desCost):null;
     const insGMabs=p.insGM!=null?absGM(p.revenue,p.insCost):null;
+    const ck=m=>`class="t-r kpi-click" title="Click to see calculation" onclick="showCalc(event,'${p.id}','${m}')"`;
     return`<tr onclick="openDetail(${projects.indexOf(p)})" style="cursor:pointer">
       <td><div class="t-name">${p.name}</div><div class="t-id">${p.id}</div></td>
       <td class="t-r">${p.kwp.toFixed(1)}</td>
-      <td class="t-r">${fmt(p.revenue)}</td>
-      <td class="t-r">${mc(p.bkGM,'#3b82f6')}</td>
-      <td class="t-r">${fmtAbs(bkGMabs)}</td>
-      <td class="t-r">${mc(p.bkNM,'#8b5cf6')}</td>
-      <td class="t-r">${p.deGM!=null?mc(p.deGM,'#f59e0b'):'<span style="color:#94a3b8;font-size:11px">No BOM</span>'}</td>
-      <td class="t-r">${p.deGM!=null?fmtAbs(deGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
-      <td class="t-r">${p.insGM!=null?mc(p.insGM,'#22c55e'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
-      <td class="t-r">${p.insGM!=null?fmtAbs(insGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
-      <td class="t-r">${p.insNM!=null?mc(p.insNM,'#10b981'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
-      <td class="t-r">${dHtml(dBkDe)}</td>
-      <td class="t-r">${dHtml(dDeIn)}</td>
-      <td class="t-r">${p.tatDays!=null?`<span style="font-weight:700;color:${p.tatDays<=60?'var(--g)':p.tatDays<=90?'#d97706':'var(--r)'}">${p.tatDays}d</span>`:'<span style="color:#94a3b8">—</span>'}</td>
+      <td ${ck('revenue')}>${fmt(p.revenue)}</td>
+      <td ${ck('bkGM')}>${mc(p.bkGM,'#3b82f6')}</td>
+      <td ${ck('bkGM')}>${fmtAbs(bkGMabs)}</td>
+      <td ${ck('bkNM')}>${mc(p.bkNM,'#8b5cf6')}</td>
+      <td ${ck('deGM')}>${p.deGM!=null?mc(p.deGM,'#f59e0b'):'<span style="color:#94a3b8;font-size:11px">No BOM</span>'}</td>
+      <td ${ck('deGM')}>${p.deGM!=null?fmtAbs(deGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
+      <td ${ck('insGM')}>${p.insGM!=null?mc(p.insGM,'#22c55e'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
+      <td ${ck('insGM')}>${p.insGM!=null?fmtAbs(insGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
+      <td ${ck('insNM')}>${p.insNM!=null?mc(p.insNM,'#10b981'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
+      <td ${ck('dBkDe')}>${dHtml(dBkDe)}</td>
+      <td ${ck('dDeIn')}>${dHtml(dDeIn)}</td>
+      <td ${ck('tat')}>${p.tatDays!=null?`<span style="font-weight:700;color:${p.tatDays<=60?'var(--g)':p.tatDays<=90?'#d97706':'var(--r)'}">${p.tatDays}d</span>`:'<span style="color:#94a3b8">—</span>'}</td>
       <td style="min-width:180px">${topDrops(p.id,'bkDe')}</td>
       <td style="min-width:180px">${topDrops(p.id,'deIn')}</td>
     </tr>`;
@@ -2143,12 +2190,192 @@ function openDetail(idx){
     {l:'NM Compression',v:p.compress!=null?pp(p.compress):'—',
       s:p.compress!=null?(p.compress>0.05?'⚠ Overrun':p.compress<0?'✓ Under budget':'Within range'):'—',
       c:p.compress>0.05?'#dc2626':p.compress<0?'#16a34a':'#64748b'},
-  ].map(m=>`<div class="dm"><label>${m.l}</label><div class="v" style="color:${m.c}">${m.v}</div><div class="s">${m.s}</div></div>`).join('');
+  ].map(m=>`<div class="dm"><label>${m.l}</label><div class="v" style="color:${m.c}">${m.v}</div><div class="s">${m.s}</div></div>`).join('')
+  + marginAnalysisHtml(p);
   document.getElementById('detailPanel').classList.add('open');
   document.getElementById('wfProjectSel').value=p.id;
   onProjectChange();
   document.getElementById('journeyCard').scrollIntoView({behavior:'smooth',block:'start'});
 }
+// Stage-by-stage GM / NM breakdown with the exact inputs used
+function marginAnalysisHtml(p){
+  const rv=p.revenue;
+  const L=v=>v==null?'—':(v<0?'−':'')+'₹'+(Math.abs(v)/1e5).toFixed(2)+'L';
+  const P=v=>v==null?'—':(v*100).toFixed(1)+'%';
+  const deNM=p.desCost>0?(rv-p.desCost-p.bkOPEX)/rv:null;
+  const stages=[
+    {n:'📋 Booking',cogs:p.bkCOGS,cs:'Booking sheet · Expense Type COGS',opex:p.bkOPEX,os:'Booking sheet · OPEX + I&C/transport/CAC…',gm:p.bkGM,nm:p.bkNM},
+    {n:'📐 Design',cogs:p.desCost||null,cs:'BOM sheet · Amount',opex:p.desCost>0?p.bkOPEX:null,os:'Booking OPEX (budget)',gm:p.deGM,nm:deNM},
+    {n:'🔧 Install',cogs:p.insCost||null,cs:'GRN sheet · Amount',opex:p.insCost>0||p.insOpex>0?(p.insOpex||0):null,os:'Install opex sheet · Amount',gm:p.insGM,nm:p.insNM},
+  ];
+  const bkLines=(window._bkOpexLines||[]).filter(x=>x.sseid===p.id);
+  const ioLines=(window._instOpexLineData||[]).filter(x=>x.sseid===p.id);
+  const warn=[];
+  if(!p.bkOPEX)warn.push('No booking opex found for this SSEID in the Booking sheet, so Booking NM% = Booking GM%.');
+  if(!p.insOpex)warn.push('No rows for this SSEID in the Install opex sheet, so Install NM% = Install GM%. Check the Project column spelling for '+p.id+'.');
+  const grp=(arr,k)=>{const m={};arr.forEach(x=>{m[x[k]||'—']=(m[x[k]||'—']||0)+x.amt;});return Object.entries(m).sort((a,b)=>b[1]-a[1]);};
+  const chips=(arr)=>arr.length?arr.map(([k,v])=>`<span class="ins-chip">${k}: ${L(v)}</span>`).join(' '):'<span style="color:var(--textl);font-size:11px">none</span>';
+  return`<div style="grid-column:1/-1;margin-top:6px">
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--textl);margin-bottom:6px">Margin analysis · Revenue ${L(rv)}</div>
+    ${warn.map(w=>`<div style="background:var(--yl);color:#92400e;border-radius:7px;padding:6px 10px;font-size:12px;margin-bottom:6px">⚠ ${w}</div>`).join('')}
+    <div style="overflow-x:auto"><table class="bdt">
+      <thead><tr><th>Stage</th><th>COGS</th><th>GM ₹</th><th>GM %</th><th>Opex</th><th>NM ₹</th><th>NM %</th><th style="text-align:left">Sources</th></tr></thead>
+      <tbody>${stages.map(s=>`<tr>
+        <td>${s.n}</td><td>${L(s.cogs)}</td>
+        <td>${s.cogs!=null?L(rv-s.cogs):'—'}</td><td>${P(s.gm)}</td>
+        <td>${L(s.opex)}</td>
+        <td>${s.cogs!=null&&s.opex!=null?L(rv-s.cogs-s.opex):'—'}</td><td>${P(s.nm)}</td>
+        <td style="text-align:left;font-size:11px;color:var(--textl);font-weight:400">${s.cs} · ${s.os}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+    <div style="font-size:11px;color:var(--textl);margin-top:8px"><b>Booking opex lines (${bkLines.length}):</b> ${chips(grp(bkLines,'part'))}</div>
+    <div style="font-size:11px;color:var(--textl);margin-top:4px"><b>Install opex lines (${ioLines.length}):</b> ${chips(grp(ioLines,'itemName'))}</div>
+  </div>`;
+}
+
+// ═══════════════════════════════════════════
+// KPI CALCULATION POPUP — click any metric in Project Margin Summary
+// ═══════════════════════════════════════════
+const _inr=v=>v==null?'—':(v<0?'−':'')+'₹'+Math.abs(Math.round(v)).toLocaleString('en-IN');
+const _pc=v=>v==null?'—':(v*100).toFixed(2)+'%';
+const _esc=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function _steps(rows){
+  return`<div class="calc-steps">${rows.map(r=>`<div class="calc-step ${r.total?'total':''}">
+    <span><span class="op">${r.op||''}</span>${r.l}${r.src?`<span class="src">(${r.src})</span>`:''}</span>
+    <span class="amt" style="${r.c?'color:'+r.c:''}">${r.v}</span></div>`).join('')}</div>`;
+}
+function _catTable(map,rv,kwp,title){
+  const e=Object.entries(map||{}).filter(([,v])=>v).sort((a,b)=>b[1]-a[1]);
+  if(!e.length)return'';
+  const tot=e.reduce((s,[,v])=>s+v,0);
+  return`<div class="calc-h">${title}</div><div class="calc-scroll"><table class="bdt">
+    <thead><tr><th>Category</th><th>Amount</th><th>₹/Wp</th><th>% of revenue</th><th>% of total</th></tr></thead>
+    <tbody>${e.map(([k,v])=>`<tr><td>${_esc(k)}</td><td>${_inr(v)}</td><td>${kwp>0?(v/(kwp*1000)).toFixed(2):'—'}</td><td>${_pc(v/rv)}</td><td>${(v/tot*100).toFixed(1)}%</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total</td><td>${_inr(tot)}</td><td>${kwp>0?(tot/(kwp*1000)).toFixed(2):'—'}</td><td>${_pc(tot/rv)}</td><td>100%</td></tr></tfoot>
+  </table></div>`;
+}
+function _lineTable(lines,cols,title){
+  if(!lines||!lines.length)return`<div class="calc-h">${title}</div><div style="font-size:12px;color:var(--textl)">No line items found.</div>`;
+  const sorted=[...lines].sort((a,b)=>b.amt-a.amt);
+  const shown=sorted.slice(0,300);
+  return`<div class="calc-h">${title} · ${lines.length} rows${lines.length>300?' (top 300 shown)':''}</div><div class="calc-scroll"><table class="bdt">
+    <thead><tr>${cols.map(c=>`<th style="${c.left?'text-align:left':''}">${c.h}</th>`).join('')}</tr></thead>
+    <tbody>${shown.map(x=>`<tr>${cols.map(c=>`<td style="${c.left?'text-align:left;font-weight:400;white-space:normal':''}">${c.f(x)}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table></div>`;
+}
+const _bkCols=[{h:'Particular',left:1,f:x=>_esc(x.particular)},{h:'Category',f:x=>_esc(x.mappedCat)},{h:'Amount',f:x=>_inr(x.amt)}];
+const _bomCols=[{h:'Item',left:1,f:x=>_esc(x.item||x.particular)},{h:'Code',f:x=>_esc(x.code)},{h:'Qty',f:x=>x.qty||'—'},{h:'Category',f:x=>_esc(x.mappedCat)},{h:'Amount',f:x=>_inr(x.amt)}];
+const _grnCols=[{h:'Item',left:1,f:x=>_esc(x.item||x.sku)},{h:'Code',f:x=>_esc(x.code)},{h:'Qty',f:x=>x.qty||'—'},{h:'Voucher',f:x=>_esc(x.voucher)},{h:'Category',f:x=>_esc(x.mappedCat||x.cat)},{h:'Amount',f:x=>_inr(x.amt)}];
+const _bkOpexCols=[{h:'Particular',left:1,f:x=>_esc(x.part)},{h:'Expense type',f:x=>_esc(x.type)},{h:'Amount',f:x=>_inr(x.amt)}];
+const _ioCols=[{h:'Item',left:1,f:x=>_esc(x.itemName)},{h:'Date',f:x=>_esc(x.date)},{h:'Category',f:x=>_esc(x.cat)},{h:'Amount',f:x=>_inr(x.amt)}];
+
+window.showCalc=function(ev,id,metric){
+  if(ev)ev.stopPropagation();
+  const p=projects.find(x=>x.id===id);if(!p)return;
+  const cd=projCatData[id]||{bk:{},bm:{},gn:{}};
+  const rv=p.revenue,kwp=p.kwp;
+  const by=(arr)=>(arr||[]).filter(x=>x.sseid===id);
+  const bkL=by(window._bkLineData),bomL=by(window._bomLineData),grnL=by(window._skuData);
+  const bkOL=by(window._bkOpexLines),ioL=by(window._instOpexLineData);
+  const deNM=p.desCost>0?(rv-p.desCost-p.bkOPEX)/rv:null;
+  const col=v=>v==null?'#94a3b8':v>=0?'#16a34a':'#dc2626';
+  let title='',formula='',big=null,bigC='#0f172a',extra='',steps=[],warn=[];
+
+  const gmBlock=(name,cogs,src)=>[
+    {l:'Revenue',src:'Revenue sheet',v:_inr(rv)},
+    {op:'−',l:name+' COGS',src,v:_inr(cogs)},
+    {op:'=',l:'Gross margin ₹',v:_inr(rv-cogs),total:1,c:col(rv-cogs)},
+    {op:'÷',l:'Revenue',v:_inr(rv)},
+    {op:'=',l:'Gross margin %',v:_pc((rv-cogs)/rv),total:1,c:col(rv-cogs)}];
+  const nmBlock=(name,cogs,csrc,opex,osrc)=>[
+    {l:'Revenue',src:'Revenue sheet',v:_inr(rv)},
+    {op:'−',l:name+' COGS',src:csrc,v:_inr(cogs)},
+    {op:'=',l:'Gross margin ₹',v:_inr(rv-cogs)},
+    {op:'−',l:name+' opex',src:osrc,v:_inr(opex)},
+    {op:'=',l:'Net margin ₹',v:_inr(rv-cogs-opex),total:1,c:col(rv-cogs-opex)},
+    {op:'÷',l:'Revenue',v:_inr(rv)},
+    {op:'=',l:'Net margin %',v:_pc((rv-cogs-opex)/rv),total:1,c:col(rv-cogs-opex)}];
+
+  switch(metric){
+    case 'revenue':
+      title='Revenue';big=_inr(rv);formula='Revenue sheet → Revenue column (matched on SSEID)';
+      steps=[{l:'Revenue',v:_inr(rv)},{l:'System size',v:kwp+' KWp'},{l:'Revenue per Wp',v:kwp>0?'₹'+(rv/(kwp*1000)).toFixed(2)+'/Wp':'—',total:1},
+        {l:'City',v:_esc(p.city)},{l:'Revenue type',v:_esc(p.revenueType)},{l:'Install type',v:_esc(p.installType)},{l:'Size bracket',v:_esc(p.sizeBracket)}];
+      break;
+    case 'bkGM':
+      title='Booking GM';big=_pc(p.bkGM);bigC=col(p.bkGM);
+      formula='Booking GM% = (Revenue − Booking COGS) ÷ Revenue';
+      steps=gmBlock('Booking',p.bkCOGS,'Booking sheet, Expense Type = COGS');
+      extra=_catTable(cd.bk,rv,kwp,'Booking COGS by category')+_lineTable(bkL,_bkCols,'Booking COGS line items');
+      break;
+    case 'bkNM':
+      title='Booking NM';big=_pc(p.bkNM);bigC=col(p.bkNM);
+      formula='Booking NM% = (Revenue − Booking COGS − Booking Opex) ÷ Revenue';
+      steps=nmBlock('Booking',p.bkCOGS,'Booking sheet, COGS',p.bkOPEX,'Booking sheet, OPEX + I&C/transport/CAC…');
+      if(!p.bkOPEX)warn.push('No booking opex found for '+id+' — that is why Booking NM% equals Booking GM%.');
+      extra=_lineTable(bkOL,_bkOpexCols,'Booking opex line items')+_catTable(cd.bk,rv,kwp,'Booking COGS by category');
+      break;
+    case 'deGM':
+      title='Design (BOM) GM';big=p.deGM!=null?_pc(p.deGM):'No BOM';bigC=col(p.deGM);
+      formula='Design GM% = (Revenue − BOM COGS) ÷ Revenue';
+      if(p.desCost>0)steps=gmBlock('BOM',p.desCost,'BOM sheet, Expense Type = COGS');
+      else warn.push('No BOM rows found for '+id+'.');
+      extra=_catTable(cd.bm,rv,kwp,'BOM COGS by category')+_lineTable(bomL,_bomCols,'BOM line items');
+      break;
+    case 'insGM':
+      title='Install GM';big=p.insGM!=null?_pc(p.insGM):'Pending';bigC=col(p.insGM);
+      formula='Install GM% = (Revenue − GRN COGS) ÷ Revenue';
+      if(p.insCost>0)steps=gmBlock('GRN',p.insCost,'GRN sheet, Amount');
+      else warn.push('No GRN rows found for '+id+' yet.');
+      extra=_catTable(cd.gn,rv,kwp,'GRN cost by category')+_lineTable(grnL,_grnCols,'GRN line items');
+      break;
+    case 'insNM':
+      title='Install NM';big=p.insNM!=null?_pc(p.insNM):'Pending';bigC=col(p.insNM);
+      formula='Install NM% = (Revenue − GRN COGS − Install Opex) ÷ Revenue';
+      steps=nmBlock('Install',p.insCost||0,'GRN sheet, Amount',p.insOpex||0,'Install opex sheet, Amount');
+      if(!p.insOpex)warn.push('No rows for '+id+' in the Install opex sheet — that is why Install NM% equals Install GM%.');
+      if(!p.insCost)warn.push('No GRN rows found for '+id+' yet.');
+      extra=_lineTable(ioL,_ioCols,'Install opex line items')+_catTable(cd.gn,rv,kwp,'GRN cost by category');
+      break;
+    case 'dBkDe':
+    case 'dDeIn':{
+      const isA=metric==='dBkDe';
+      const [aN,bN,aM,bM,aG,bG]=isA?['Booking','Design',cd.bk,cd.bm,p.bkGM,p.deGM]:['Design','Install',cd.bm,cd.gn,p.deGM,p.insGM];
+      title=`Δ ${aN} → ${bN} GM`;
+      const d=aG!=null&&bG!=null?bG-aG:null;big=d!=null?(d>=0?'+':'')+(d*100).toFixed(2)+' pp':'—';bigC=col(d);
+      formula=`Δ = ${bN} GM% − ${aN} GM%   (positive = margin improved)`;
+      steps=[{l:bN+' GM%',v:_pc(bG)},{op:'−',l:aN+' GM%',v:_pc(aG)},{op:'=',l:'Change',v:big,total:1,c:col(d)}];
+      const cats=[...new Set([...Object.keys(aM||{}),...Object.keys(bM||{})])];
+      const rows=cats.map(c=>{const a=(aM||{})[c]||0,b=(bM||{})[c]||0;
+        // when the later stage has no amount for a category, the drop uses the earlier stage as base (same as waterfall)
+        return{c,a,b,imp:(a-b)/rv};}).filter(r=>r.a||r.b).sort((x,y)=>x.imp-y.imp);
+      extra=`<div class="calc-h">Category contribution to the change</div><div class="calc-scroll"><table class="bdt">
+        <thead><tr><th>Category</th><th>${aN}</th><th>${bN}</th><th>Cost change</th><th>GM impact</th></tr></thead>
+        <tbody>${rows.map(r=>`<tr><td>${_esc(r.c)}</td><td>${_inr(r.a)}</td><td>${_inr(r.b)}</td><td>${_inr(r.b-r.a)}</td>
+          <td style="color:${col(r.imp)};font-weight:700">${r.imp>=0?'+':''}${(r.imp*100).toFixed(2)} pp</td></tr>`).join('')}</tbody></table></div>
+        <div style="font-size:11px;color:var(--textl);margin-top:6px">GM impact = (${aN} cost − ${bN} cost) ÷ Revenue. Red rows are where costs went up.</div>`;
+      break;}
+    case 'tat':
+      title='Booking → Install TAT';big=p.tatDays!=null?p.tatDays+' days':'—';
+      bigC=p.tatDays==null?'#94a3b8':p.tatDays<=60?'#16a34a':p.tatDays<=90?'#d97706':'#dc2626';
+      formula='TAT = Installation Date − Booking Date (from the Revenue sheet TAT column)';
+      steps=[{l:'Booking date',v:_esc(p.bookingDate||'—')},{l:'Installation date',v:_esc(p.installDate||'—')},{op:'=',l:'TAT',v:big,total:1,c:bigC}];
+      break;
+  }
+
+  document.getElementById('calcTitle').textContent=title;
+  document.getElementById('calcSub').textContent=`${p.name} · ${id} · ${kwp} KWp`;
+  document.getElementById('calcBody').innerHTML=
+    `<div class="calc-result"><span class="big" style="color:${bigC}">${big}</span></div>
+     <div class="calc-formula">${formula}</div>
+     ${warn.map(w=>`<div class="calc-warn">⚠ ${w}</div>`).join('')}
+     ${steps.length?_steps(steps):''}${extra}`;
+  document.getElementById('calcOverlay').classList.add('open');
+};
+window.closeCalc=function(){document.getElementById('calcOverlay').classList.remove('open');};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeCalc();});
+
 function closeDetail(){document.getElementById('detailPanel').classList.remove('open');}
 
 // ═══════════════════════════════════════════
