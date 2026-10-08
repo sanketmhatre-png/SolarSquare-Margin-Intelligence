@@ -114,6 +114,31 @@ td.kpi-click:hover{background:#eef6ff!important;box-shadow:inset 0 0 0 1.5px #93
 .calc-scroll table{font-size:12px}
 .calc-scroll th{position:sticky;top:0;background:#f8fafc;cursor:default}
 .calc-scroll td,.calc-scroll th{padding:6px 10px}
+/* ── PROJECT REVIEW POPUP */
+.calc-box.wide{width:1180px}
+.pr-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.pr-card{border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;background:#fafafa}
+.pr-card label{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--textl);font-weight:700}
+.pr-card .v{font-size:20px;font-weight:900;margin-top:2px}
+.pr-card .s{font-size:11px;color:var(--textl);margin-top:2px}
+.pr-verdict{border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:13px;line-height:1.55}
+.pr-verdict.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#14532d}
+.pr-verdict.warn{background:#fffbeb;border:1px solid #fde68a;color:#78350f}
+.pr-verdict.err{background:#fef2f2;border:1px solid #fecaca;color:#7f1d1d}
+.pr-verdict b.h{font-size:15px;display:block;margin-bottom:4px}
+.pr-check{display:flex;gap:10px;padding:9px 12px;border-bottom:1px solid #f1f5f9;font-size:12.5px;line-height:1.5}
+.pr-check:last-child{border-bottom:none}
+.pr-check .ic{font-size:15px;flex-shrink:0;width:20px;text-align:center}
+.pr-check .t{font-weight:700;color:var(--dark)}
+.pr-check .d{color:var(--text)}
+.pr-check .a{color:#0e4f6a;font-size:11.5px;margin-top:2px}
+.pr-tbl td,.pr-tbl th{padding:7px 10px;font-size:12px}
+.pr-tbl tr.hl td{background:#f8fafc;font-weight:800}
+.pr-tag{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px}
+.pr-tag.ok{background:var(--gl);color:var(--g)}.pr-tag.warn{background:var(--yl);color:#92400e}
+.pr-tag.err{background:var(--rl);color:var(--r)}.pr-tag.info{background:var(--bl);color:var(--b)}
+.pr-2col{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:800px){.pr-2col{grid-template-columns:1fr}}
 /* ── DOWNLOAD MODAL */
 .dl-overlay{position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center}
 .dl-overlay.open{display:flex}
@@ -626,7 +651,7 @@ tr:hover td{background:#fafbfc}
 
     <div class="tbl-card">
       <div class="sec-hdr">
-        <div><div class="sec-title">Project Margin Summary</div><div class="sec-sub">Click row for detail · click header to sort</div></div>
+        <div><div class="sec-title">Project Margin Summary</div><div class="sec-sub">Click a project for full Booking vs Install review · click a number for its calculation · click header to sort</div></div>
         <div class="pills">
           <div class="pill pill-b active" id="fAll" onclick="sf('all')">All</div>
           <div class="pill pill-g" id="fGood" onclick="sf('good')">GM &gt;30%</div>
@@ -687,6 +712,19 @@ tr:hover td{background:#fafbfc}
 </div>
 
 <!-- ── DOWNLOAD MODAL ── -->
+<div class="calc-overlay" id="prOverlay" onclick="if(event.target===this)closeProjectReview()">
+  <div class="calc-box wide">
+    <div class="calc-head">
+      <div><div class="calc-title" id="prTitle"></div><div class="calc-sub" id="prSub"></div></div>
+      <div style="display:flex;gap:8px;align-items:flex-start">
+        <button class="btn" style="background:var(--tl);color:var(--teal);font-size:12px" id="prWfBtn">📊 Waterfall</button>
+        <button class="detail-close" onclick="closeProjectReview()">✕</button>
+      </div>
+    </div>
+    <div class="calc-body" id="prBody"></div>
+  </div>
+</div>
+
 <div class="calc-overlay" id="calcOverlay" onclick="if(event.target===this)closeCalc()">
   <div class="calc-box">
     <div class="calc-head">
@@ -1156,7 +1194,7 @@ function processData(rev,booking,bom,grn,installOpex){
     const particular=(r.Particulars||r.Description||r.Item||r.PARTICULAR||'').toString().trim().toUpperCase()||rawCat;
     const mappedCat=mapBK(r.Particulars||r.Category||'');
     if(mappedCat==='__OPEX__')return;
-    window._bkLineData.push({sseid:id,particular,rawCat,mappedCat,amt:cost,kwp:revMap[id].kwp});
+    window._bkLineData.push({sseid:id,particular,rawCat,mappedCat,amt:cost,kwp:revMap[id].kwp,qty:num(r.Qty||0),uom:(r.UoM||'').toString().trim().toUpperCase(),rate:num(r.rate||r.Rate||0)});
   });
 
   // Re-scan BOM for raw line items
@@ -2080,7 +2118,7 @@ function renderTable(){
     const deGMabs=p.deGM!=null?absGM(p.revenue,p.desCost):null;
     const insGMabs=p.insGM!=null?absGM(p.revenue,p.insCost):null;
     const ck=m=>`class="t-r kpi-click" title="Click to see calculation" onclick="showCalc(event,'${p.id}','${m}')"`;
-    return`<tr onclick="openDetail(${projects.indexOf(p)})" style="cursor:pointer">
+    return`<tr onclick="showProjectReview('${p.id}')" style="cursor:pointer">
       <td><div class="t-name">${p.name}</div><div class="t-id">${p.id}</div></td>
       <td class="t-r">${p.kwp.toFixed(1)}</td>
       <td ${ck('revenue')}>${fmt(p.revenue)}</td>
@@ -2375,6 +2413,201 @@ window.showCalc=function(ev,id,metric){
 };
 window.closeCalc=function(){document.getElementById('calcOverlay').classList.remove('open');};
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeCalc();});
+
+
+// ═══════════════════════════════════════════
+// PROJECT REVIEW POPUP — Booking vs Install GM/NM + finance-manager checks
+// ═══════════════════════════════════════════
+window.showProjectReview=function(id){
+  const p=projects.find(x=>x.id===id);if(!p)return;
+  const cd=projCatData[id]||{bk:{},bm:{},gn:{}};
+  const rv=p.revenue,kwp=p.kwp,W=kwp*1000;
+  const by=a=>(a||[]).filter(x=>x.sseid===id);
+  const bkL=by(window._bkLineData),bomL=by(window._bomLineData),grnL=by(window._skuData);
+  const bkOL=by(window._bkOpexLines),ioL=by(window._instOpexLineData);
+  const L=v=>v==null?'—':(v<0?'−':'')+'₹'+(Math.abs(v)/1e5).toFixed(2)+'L';
+  const R=v=>v==null?'—':(v<0?'−':'')+'₹'+Math.abs(Math.round(v)).toLocaleString('en-IN');
+  const P=v=>v==null?'—':(v*100).toFixed(1)+'%';
+  const PP=v=>v==null?'—':(v>=0?'+':'')+(v*100).toFixed(1)+' pp';
+  const WP=v=>v==null||!W?'—':'₹'+(v/W).toFixed(2);
+  const col=v=>v==null?'#94a3b8':v>=0?'#16a34a':'#dc2626';
+
+  // ── Core numbers
+  const hasDe=p.desCost>0,hasIn=p.insCost>0;
+  const bkGM=p.bkGM,bkNM=p.bkNM;
+  const deGM=hasDe?p.deGM:null,deNM=hasDe?(rv-p.desCost-p.bkOPEX)/rv:null;
+  const inGM=hasIn?p.insGM:null,inNM=hasIn?(rv-p.insCost-(p.insOpex||0))/rv:null;
+  // Booking I&C budget vs other opex (CAC, contingency, finance…)
+  const isIC=t=>/I\s*&\s*C|INSTALL|LABOU?R/i.test(t||'');
+  const bkIC=bkOL.filter(x=>isIC(x.part)).reduce((s,x)=>s+x.amt,0);
+  const bkOtherOpex=Math.max(0,(p.bkOPEX||0)-bkIC);
+  // Like-for-like: actual install opex replaces booked I&C, other booked opex carried over
+  const inNMl4l=hasIn?(rv-p.insCost-(p.insOpex||0)-bkOtherOpex)/rv:null;
+
+  // ── Finance-manager checks
+  const C=[];
+  const add=(lvl,t,d,a)=>C.push({lvl,t,d,a});
+  // Revenue sanity
+  const rwp=W?rv/W:0;
+  if(!rv)add('err','Revenue missing','No revenue for this SSEID, so no margin can be trusted.','Check the Revenue sheet row.');
+  else if(rwp<25||rwp>150)add('warn','Unusual revenue per Wp',`Revenue works out to ₹${rwp.toFixed(1)}/Wp on ${kwp} KWp, outside the normal ₹25–150/Wp range.`,'Check that KWP and Revenue in the Revenue sheet are in the right units (KWp, not Wp; ₹, not lakh).');
+  else add('ok','Revenue looks reasonable',`₹${rwp.toFixed(1)}/Wp on ${kwp} KWp.`);
+  // Booked kWp vs Revenue kWp (module line booked in KWP)
+  const bkMod=bkL.filter(x=>x.mappedCat==='MODULE'&&x.uom==='KWP');
+  const bkModKwp=bkMod.reduce((s,x)=>s+x.qty,0);
+  if(bkMod.length&&kwp>0){
+    const d=(bkModKwp-kwp)/kwp;
+    if(Math.abs(d)>0.03)add('warn','Booked module KWp ≠ project KWp',`Booking sheet module qty is ${bkModKwp.toFixed(2)} KWp vs ${kwp} KWp in the Revenue sheet (${(d*100).toFixed(1)}%).`,'Booking costs are built on a different system size, so Booking GM/NM is not like-for-like with revenue.');
+    else add('ok','Booked KWp matches project KWp',`${bkModKwp.toFixed(2)} KWp booked vs ${kwp} KWp.`);
+  }
+  // Booking COGS
+  if(!p.bkCOGS)add('err','No booking COGS','Booking GM% shows 100% because no COGS rows were found.','Check SSEID spelling and Expense Type = COGS in the Booking sheet.');
+  // Booking opex
+  if(!p.bkOPEX)add('warn','No booking opex',`Booking NM% (${P(bkNM)}) equals Booking GM% because no opex rows were found.`,'Add I&C, CAC, contingency etc. to the Booking sheet, or the booked net margin is overstated.');
+  else add('ok','Booking opex present',`${R(p.bkOPEX)} (${P(p.bkOPEX/rv)} of revenue) across ${bkOL.length} line(s); of this, I&C = ${R(bkIC)}.`);
+  // GRN completeness
+  if(!hasIn)add('info','Install not started','No GRN rows yet, so Install GM/NM are pending.');
+  else{
+    const cov=p.bkCOGS>0?p.insCost/p.bkCOGS:null;
+    if(cov!=null){
+      if(cov<0.75)add('err','GRN looks incomplete',`Install COGS is only ${(cov*100).toFixed(0)}% of booking COGS (${L(p.insCost)} vs ${L(p.bkCOGS)}).`,'Material is probably still to be received or GRNs are tagged to another SSEID. Install GM/NM will be overstated until GRN is complete.');
+      else if(cov<0.9)add('warn','GRN may be partly pending',`Install COGS is ${(cov*100).toFixed(0)}% of booking COGS.`,'Confirm all material is received before closing margins.');
+      else if(cov>1.3)add('err','Install cost far above booking',`Install COGS is ${(cov*100).toFixed(0)}% of booking COGS (${L(p.insCost)} vs ${L(p.bkCOGS)}).`,'Possible duplicate GRNs, returns not reversed, or another project\'s GRN tagged to this SSEID.');
+      else if(cov>1.15)add('warn','Install cost overrun',`Install COGS is ${(cov*100).toFixed(0)}% of booking COGS.`,'Genuine overrun or extra material; see category table for the driver.');
+      else add('ok','GRN coverage looks complete',`Install COGS is ${(cov*100).toFixed(0)}% of booking COGS.`);
+    }
+    // Missing major categories
+    ['MODULE','INVERTER','MMS','CABLING'].forEach(c=>{
+      const b=(cd.bk||{})[c]||0,g=(cd.gn||{})[c]||0;
+      if(b>0&&g===0)add('err',`No GRN for ${c}`,`${c} was booked at ${L(b)} but has no GRN cost.`,`Install GM is overstated by about ${P(b/rv)} until ${c} is received or re-tagged.`);
+    });
+    // Module capacity received from GRN item names (e.g. "540 Wp …")
+    const modWp=ls=>ls.filter(x=>(x.mappedCat||'').toUpperCase()==='MODULE'||(x.cat||'').toUpperCase()==='MODULE')
+      .reduce((s,x)=>{const m=String(x.item||'').match(/(\d{3})\s*W\s*p/i);return m?s+(x.qty||0)*+m[1]:s;},0)/1000;
+    const grnKwp=modWp(grnL);
+    if(grnKwp>0&&kwp>0){
+      const d=(grnKwp-kwp)/kwp;
+      if(d<-0.05)add('warn','Fewer modules received than project size',`GRN modules add up to ${grnKwp.toFixed(2)} KWp vs ${kwp} KWp (${(d*100).toFixed(1)}%).`,'Module GRN is partial; module cost and Install GM will move once the balance is received.');
+      else if(d>0.05)add('warn','More modules received than project size',`GRN modules add up to ${grnKwp.toFixed(2)} KWp vs ${kwp} KWp (+${(d*100).toFixed(1)}%).`,'Check for duplicate module GRNs, spares charged to the project, or wrong SSEID tagging.');
+      else add('ok','Module quantity matches project size',`GRN modules = ${grnKwp.toFixed(2)} KWp vs ${kwp} KWp.`);
+    }
+    // Duplicates & returns
+    const seen={},dup=[];
+    grnL.forEach(x=>{const k=[x.code,x.qty,x.amt,x.voucher].join('|');if(seen[k])dup.push(x);seen[k]=1;});
+    if(dup.length)add('warn','Possible duplicate GRN lines',`${dup.length} GRN line(s) repeat the same item, qty, amount and voucher (${R(dup.reduce((s,x)=>s+x.amt,0))}).`,'Verify in ERP; if duplicated, Install COGS is overstated.');
+    const neg=grnL.filter(x=>x.amt<0);
+    if(neg.length)add('info','Returns / reversals in GRN',`${neg.length} negative line(s) totalling ${R(neg.reduce((s,x)=>s+x.amt,0))} are netted off.`);
+    // Install better than booking
+    if(inGM!=null&&inGM-bkGM>0.05)add('warn','Install GM is well above booking',`Install GM ${P(inGM)} vs Booking GM ${P(bkGM)} (${PP(inGM-bkGM)}).`,'Costs rarely fall this much after booking; usually GRN is incomplete or booking was padded. Validate before reporting.');
+    // Install opex
+    if(!p.insOpex)add('err','No install opex recorded',`Install NM% (${P(inNM)}) equals Install GM% because no rows were found in the Install opex sheet.`,'I&C partner / labour service orders are missing or tagged with a different Project ID. Install NM is overstated.');
+    else{
+      if(bkIC>0){
+        const r=p.insOpex/bkIC;
+        if(r>1.2)add('warn','Install opex above booked I&C',`Actual ${R(p.insOpex)} vs booked I&C ${R(bkIC)} (${(r*100).toFixed(0)}%).`,'Execution cost overrun; check extra service orders.');
+        else if(r<0.6)add('warn','Install opex well below booked I&C',`Actual ${R(p.insOpex)} vs booked I&C ${R(bkIC)} (${(r*100).toFixed(0)}%).`,'Some service orders may still be pending.');
+        else add('ok','Install opex in line with booked I&C',`Actual ${R(p.insOpex)} vs booked I&C ${R(bkIC)}.`);
+      }else add('info','Install opex recorded',`${R(p.insOpex)} across ${ioL.length} service order line(s); no I&C line in booking to compare against.`);
+    }
+    // NM comparability
+    if(bkOtherOpex>0)add('info','Install NM excludes non-install opex',`Booking NM deducts ${R(bkOtherOpex)} of other opex (CAC, contingency, finance…) that Install NM does not.`,`Like-for-like Install NM = ${P(inNMl4l)} (vs ${P(inNM)} shown), so true NM movement is ${PP(inNMl4l-bkNM)}.`);
+  }
+  if(p.tatDays!=null&&p.tatDays>180)add('info','Long booking-to-install TAT',`${p.tatDays} days. Price changes between booking and install can explain cost variance.`);
+
+  const nErr=C.filter(c=>c.lvl==='err').length,nWarn=C.filter(c=>c.lvl==='warn').length;
+  const vLvl=nErr?'err':nWarn?'warn':'ok';
+
+  // ── Category variance (Booking → Install)
+  const cats=[...new Set([...Object.keys(cd.bk||{}),...Object.keys(cd.bm||{}),...Object.keys(cd.gn||{})])]
+    .map(c=>{const b=(cd.bk||{})[c]||0,d=(cd.bm||{})[c]||0,g=(cd.gn||{})[c]||0;
+      const imp=hasIn?(b-g)/rv:null;
+      let st='ok',stT='OK';
+      if(!hasIn){st='info';stT='Pending';}
+      else if(b>0&&g===0){st='err';stT='Not received';}
+      else if(b===0&&g>0){st='warn';stT='Not booked';}
+      else if(g>b*1.15){st='err';stT='Overrun';}
+      else if(g<b*0.85){st='warn';stT='Under — check';}
+      return{c,b,d,g,imp,st,stT};})
+    .filter(r=>r.b||r.d||r.g).sort((x,y)=>(x.imp??0)-(y.imp??0));
+  const drivers=cats.filter(r=>r.imp!=null&&r.imp<-0.002).slice(0,3);
+
+  // ── Narrative
+  let story=`Booking GM ${P(bkGM)} / NM ${P(bkNM)}`;
+  if(hasIn){
+    story+=` → Install GM ${P(inGM)} / NM ${P(inNM)}. GM moved ${PP(inGM-bkGM)}; NM moved ${PP(inNM-bkNM)}`
+      +(bkOtherOpex>0?` as shown, but only ${PP(inNMl4l-bkNM)} like-for-like (booking NM also deducts ${L(bkOtherOpex)} of non-install opex).`:'.');
+    if(drivers.length)story+=` Biggest GM drags: ${drivers.map(r=>`${r.c} (${PP(r.imp)})`).join(', ')}.`;
+  }else story+='. Install not yet costed.';
+  const vHead=vLvl==='ok'?'✅ Numbers look correct':vLvl==='warn'?`⚠ Usable with caveats — ${nWarn} point(s) to review`:`❌ Not reliable yet — ${nErr} issue(s)${nWarn?`, ${nWarn} to review`:''}`;
+
+  // ── Comparison table
+  const stg=[
+    {n:'📋 Booking',cogs:p.bkCOGS,opex:p.bkOPEX,gm:bkGM,nm:bkNM},
+    {n:'📐 Design',cogs:hasDe?p.desCost:null,opex:hasDe?p.bkOPEX:null,gm:deGM,nm:deNM,note:'opex = booked'},
+    {n:'🔧 Install',cogs:hasIn?p.insCost:null,opex:hasIn?(p.insOpex||0):null,gm:inGM,nm:inNM},
+  ];
+  const varCell=(a,b,fmt,inv)=>{if(a==null||b==null)return'<td>—</td>';const d=b-a;const good=inv?d<=0:d>=0;
+    return`<td style="font-weight:700;color:${Math.abs(d)<1e-9?'#64748b':good?'#16a34a':'#dc2626'}">${fmt(d)}</td>`;};
+  const rowsDef=[
+    ['COGS',s=>L(s.cogs),'cogs',v=>(v>=0?'+':'')+L(v),true],
+    ['COGS ₹/Wp',s=>WP(s.cogs),null],
+    ['Gross margin ₹',s=>s.cogs!=null?L(rv-s.cogs):'—',null],
+    ['GM %',s=>`<b style="color:${col(s.gm)}">${P(s.gm)}</b>`,'gm',PP,false,1],
+    ['Opex',s=>L(s.opex),'opex',v=>(v>=0?'+':'')+L(v),true],
+    ['Opex % of revenue',s=>s.opex!=null?P(s.opex/rv):'—',null],
+    ['Net margin ₹',s=>s.cogs!=null&&s.opex!=null?L(rv-s.cogs-s.opex):'—',null],
+    ['NM %',s=>`<b style="color:${col(s.nm)}">${P(s.nm)}</b>`,'nm',PP,false,1],
+  ];
+  const cmpTbl=`<div class="calc-scroll" style="max-height:none"><table class="bdt pr-tbl">
+    <thead><tr><th>Revenue ${L(rv)}</th>${stg.map(s=>`<th>${s.n}</th>`).join('')}<th>Install vs Booking</th></tr></thead>
+    <tbody>${rowsDef.map(([lbl,f,k,fmtD,inv,hl])=>`<tr class="${hl?'hl':''}"><td>${lbl}</td>${stg.map(s=>`<td>${f(s)}</td>`).join('')}${k?varCell(stg[0][k],stg[2][k],fmtD,inv):'<td></td>'}</tr>`).join('')}
+    ${hasIn?`<tr><td>NM % like-for-like <span class="pr-tag info">?</span></td><td></td><td></td><td><b style="color:${col(inNMl4l)}">${P(inNMl4l)}</b></td><td style="font-weight:700;color:${col(inNMl4l-bkNM)}">${PP(inNMl4l-bkNM)}</td></tr>`:''}
+    </tbody></table></div>
+    ${hasIn?`<div style="font-size:11px;color:var(--textl);margin-top:5px">Like-for-like Install NM = (Revenue − GRN COGS − actual Install opex − booked non-I&C opex ${R(bkOtherOpex)}) ÷ Revenue. Use this to compare with Booking NM.</div>`:''}`;
+
+  const catTbl=cats.length?`<div class="calc-scroll"><table class="bdt pr-tbl">
+    <thead><tr><th>Category</th><th>Booking</th><th>Design</th><th>Install</th><th>Inst − Bk</th><th>Bk ₹/Wp</th><th>Inst ₹/Wp</th><th>GM impact</th><th>Status</th></tr></thead>
+    <tbody>${cats.map(r=>`<tr><td>${_esc(r.c)}</td><td>${L(r.b)}</td><td>${r.d?L(r.d):'—'}</td><td>${hasIn?L(r.g):'—'}</td>
+      <td style="color:${!hasIn?'#94a3b8':r.g-r.b>0?'#dc2626':'#16a34a'};font-weight:700">${hasIn?(r.g-r.b>=0?'+':'')+L(r.g-r.b):'—'}</td>
+      <td>${WP(r.b)}</td><td>${hasIn?WP(r.g):'—'}</td>
+      <td style="font-weight:700;color:${col(r.imp)}">${PP(r.imp)}</td><td><span class="pr-tag ${r.st}">${r.stT}</span></td></tr>`).join('')}</tbody>
+    </table></div>`:'<div style="font-size:12px;color:var(--textl)">No category data.</div>';
+
+  const grpL=(arr,k)=>{const m={};arr.forEach(x=>{const n=x[k]||'—';m[n]=(m[n]||0)+x.amt;});return Object.entries(m).sort((a,b)=>b[1]-a[1]);};
+  const opexList=(arr,tot,title)=>`<div><div class="calc-h">${title} · ${R(tot)}</div><div class="calc-scroll" style="max-height:200px"><table class="bdt pr-tbl">
+    <tbody>${arr.length?arr.map(([k,v])=>`<tr><td>${_esc(k)}</td><td>${R(v)}</td><td>${P(v/rv)}</td></tr>`).join(''):'<tr><td style="color:var(--textl)">No lines found</td></tr>'}</tbody></table></div></div>`;
+
+  const card=(l,v,s,c)=>`<div class="pr-card"><label>${l}</label><div class="v" style="color:${c}">${v}</div><div class="s">${s}</div></div>`;
+  const icons={ok:'✅',warn:'⚠️',err:'❌',info:'ℹ️'};
+  const order={err:0,warn:1,info:2,ok:3};
+
+  document.getElementById('prTitle').textContent=p.name;
+  document.getElementById('prSub').textContent=`${id} · ${kwp} KWp · ${fmt(rv)} · ${p.city||'—'} · ${p.revenueType||'—'} · ${p.installType||'—'}${p.tatDays!=null?` · TAT ${p.tatDays}d`:''}`;
+  document.getElementById('prWfBtn').onclick=()=>{closeProjectReview();openDetail(projects.indexOf(p));};
+  document.getElementById('prBody').innerHTML=`
+    <div class="pr-verdict ${vLvl}"><b class="h">${vHead}</b>${story}</div>
+    <div class="pr-cards">
+      ${card('Booking GM',P(bkGM),'NM '+P(bkNM),'#1d4ed8')}
+      ${card('Design GM',P(deGM),'NM '+P(deNM),'#b45309')}
+      ${card('Install GM',hasIn?P(inGM):'Pending','NM '+P(inNM),'#15803d')}
+      ${card('GM change',hasIn?PP(inGM-bkGM):'—','Booking → Install',col(hasIn?inGM-bkGM:null))}
+      ${card('NM change',hasIn?PP(inNM-bkNM):'—','Like-for-like '+(hasIn?PP(inNMl4l-bkNM):'—'),col(hasIn?inNM-bkNM:null))}
+    </div>
+    <div class="calc-h">Booking vs Design vs Install</div>${cmpTbl}
+    <div class="calc-h">Finance review — are these numbers right?</div>
+    <div class="calc-steps">${C.sort((a,b)=>order[a.lvl]-order[b.lvl]).map(c=>`<div class="pr-check"><span class="ic">${icons[c.lvl]}</span>
+      <div><div class="t">${c.t}</div><div class="d">${c.d}</div>${c.a?`<div class="a">→ ${c.a}</div>`:''}</div></div>`).join('')}</div>
+    <div class="calc-h">Cost variance by category (sorted by GM impact)</div>${catTbl}
+    <div class="pr-2col">
+      ${opexList(grpL(bkOL,'part'),p.bkOPEX||0,'Booking opex')}
+      ${opexList(grpL(ioL,'itemName'),p.insOpex||0,'Install opex (actual)')}
+    </div>
+    <div style="font-size:11px;color:var(--textl);margin-top:12px">Checks are automatic rules of thumb (GRN coverage 90–115% of booking, module KWp ±5%, opex vs booked I&C 60–120%). Click any number in the table for its line-level calculation.</div>`;
+  document.getElementById('prOverlay').classList.add('open');
+  document.getElementById('prBody').scrollTop=0;
+};
+window.closeProjectReview=function(){document.getElementById('prOverlay').classList.remove('open');};
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeProjectReview();});
 
 function closeDetail(){document.getElementById('detailPanel').classList.remove('open');}
 
