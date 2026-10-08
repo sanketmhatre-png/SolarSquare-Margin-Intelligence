@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+=<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1120,12 +1120,22 @@ function processData(rev,booking,bom,grn,installOpex){
     window._bomLineData.push({sseid:id,particular,rawCat,mappedCat,amt,kwp:revMap[id].kwp});
   });
 
+  // Helper — find value tolerantly across possible column name variants
+  const getSSEID=r=>( r.SSEID||r.sseid||r['SSE ID']||r['Sse Id']||r['SSHE ID']||r['Project ID']||'' ).trim();
+  const getAmt=r=>num( r.Amount||r.amount||r.AMOUNT||r['Amount (₹)']||r['Amt']||r.amt||0 );
+
+  // Debug: log actual column names from each sheet so mismatches are visible
+  if(grn.length)       console.log('[DEBUG] GRN columns:',        Object.keys(grn[0]));
+  if(installOpex.length) console.log('[DEBUG] Install opex columns:', Object.keys(installOpex[0]));
+  if(bom.length)       console.log('[DEBUG] BOM columns:',        Object.keys(bom[0]));
+  if(booking.length)   console.log('[DEBUG] Booking columns:',    Object.keys(booking[0]));
+
   // GRN = pure COGS (Install OPEX comes from its own sheet)
   grn.forEach(r=>{
-    const id=(r.SSEID||'').trim();if(!id||!revMap[id])return;
+    const id=getSSEID(r);if(!id||!revMap[id])return;
     if(!grnMap[id])grnMap[id]=0;
     if(!grnCatMap[id])grnCatMap[id]={};
-    const amt=num(r.Amount||0);
+    const amt=getAmt(r);
     const rawCat=(r.Category||r.Particulars||'').toString().trim().toUpperCase()||'OTHER';
     const cat=mapBG(r.Category||r.Particulars||'');
     const sku=(r.Particulars||r.Description||r.Item||r.PARTICULAR||'').toString().trim().toUpperCase()||rawCat;
@@ -1146,8 +1156,8 @@ function processData(rev,booking,bom,grn,installOpex){
   // ── Install OPEX sheet — sum Amount per SSEID
   const insOpexMap={};
   installOpex.forEach(r=>{
-    const id=(r.SSEID||'').trim();if(!id||!revMap[id])return;
-    const amt=num(r.Amount||0);
+    const id=getSSEID(r);if(!id||!revMap[id])return;
+    const amt=getAmt(r);
     insOpexMap[id]=(insOpexMap[id]||0)+amt;
   });
   catCosts=catTotals;
