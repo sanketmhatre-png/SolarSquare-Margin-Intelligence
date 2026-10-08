@@ -391,6 +391,7 @@ tr:hover td{background:#fafbfc}
       <div class="load-step" id="ls-Booking"><span class="load-step-icon">⏳</span>Booking sheet (costs &amp; targets)</div>
       <div class="load-step" id="ls-BOM"><span class="load-step-icon">⏳</span>BOM sheet (design estimates)</div>
       <div class="load-step" id="ls-GRN"><span class="load-step-icon">⏳</span>GRN sheet (actual install costs)</div>
+      <div class="load-step" id="ls-Install opex"><span class="load-step-icon">⏳</span>Install opex sheet (I&amp;C + labour)</div>
       <div class="load-step" id="ls-Process"><span class="load-step-icon">⏳</span>Computing margins…</div>
     </div>
   </div>
@@ -688,6 +689,10 @@ tr:hover td{background:#fafbfc}
           <input type="checkbox" checked onchange="toggleChip('install',this)">
           <span class="dl-sheet-chip-icon">🔧</span><span>Install (GRN) Items</span>
         </label>
+        <label class="dl-sheet-chip selected" id="chip-instopex">
+          <input type="checkbox" checked onchange="toggleChip('instopex',this)">
+          <span class="dl-sheet-chip-icon">💸</span><span>Install Opex</span>
+        </label>
       </div>
     </div>
 
@@ -972,7 +977,7 @@ function mapBK(part){
 // ═══════════════════════════════════════════
 // DATA PROCESSING
 // ═══════════════════════════════════════════
-function processData(rev,booking,bom,grn){
+function processData(rev,booking,bom,grn,installOpex){
   const revMap={};
   // ── Detect Installation Month column — brute-force score every column
   let installMonthCol=null;
@@ -1137,6 +1142,30 @@ function processData(rev,booking,bom,grn){
     }
   });
   catCosts=catTotals;
+
+  // ── Install Opex map: sseid → total opex amount (I&C + Labour from Install opex sheet)
+  const instOpexMap={};
+  window._instOpexLineData=[];
+  (installOpex||[]).forEach(r=>{
+    // Project column is "Project" (SSEID like SSHS_1571)
+    const id=(r.Project||r.SSEID||'').trim();
+    if(!id||!revMap[id])return;
+    // Amount column: gviz truncates long headers — try several variants
+    const amtRaw=r['Amount (Company Currency) (It...']
+      ||r['Amount (Company Currency)']
+      ||r['Amount']
+      // fallback: find first key containing 'Amount' (case-insensitive)
+      ||(Object.entries(r).find(([k])=>k.toLowerCase().includes('amount'))||[])[1]
+      ||0;
+    const amt=num(amtRaw);
+    if(!amt)return;
+    instOpexMap[id]=(instOpexMap[id]||0)+amt;
+    const cat=(r.Category||r.Type||'I&C').toString().trim();
+    const itemName=(r['Item Name (Items)']||'').toString().trim();
+    window._instOpexLineData.push({sseid:id,itemName,cat,amt,kwp:revMap[id].kwp,date:r.Date||''});
+  });
+  window._instOpexMap=instOpexMap;
+
   // Build sorted availableMonths — prefer Revenue "Installation Month", fallback to GRN dates
   const monthSource=Object.keys(projByInstallMonth).length>0
     ? projByInstallMonth
@@ -1155,13 +1184,15 @@ function processData(rev,booking,bom,grn){
     const rd=revMap[id];
     const bk=bkMap[id]||{cogs:0,opex:0};
     const de=bomMap[id]||0;const ins=grnMap[id]||0;const rv=rd.revenue;
+    const insOpex=instOpexMap[id]||0;   // actual install opex from Install opex sheet
     if(!rv)return;
     projCatData[id]={bk:bkCatMap[id]||{},bm:bomCatMap[id]||{},gn:grnCatMap[id]||{},
-      revenue:rv,bkCOGS:bk.cogs,bkOPEX:bk.opex};
+      revenue:rv,bkCOGS:bk.cogs,bkOPEX:bk.opex,insOpex};
     const bkGM=(rv-bk.cogs)/rv,bkNM=(rv-bk.cogs-bk.opex)/rv;
     const deGM=de>0?(rv-de)/rv:null;
     const insGM=ins>0?(rv-ins)/rv:null;
-    const insNM=ins>0?(rv-ins-bk.opex)/rv:null;
+    // NEW: Install NM = (Revenue - GRN COGS - Install Opex) / Revenue
+    const insNM=(ins>0||insOpex>0)&&rv>0?(rv-ins-insOpex)/rv:null;
     // Use pre-calculated TAT from Column M
     const _tatNum=rd.tatRaw!==''?Math.round(parseFloat(rd.tatRaw.replace(/[^0-9.\-]/g,''))):NaN;
     const tatDays=(!isNaN(_tatNum)&&_tatNum>0)?_tatNum:null;
@@ -1169,7 +1200,7 @@ function processData(rev,booking,bom,grn){
       city:rd.city||'Unknown', sizeBracket:rd.sizeBracket||'Unknown', revenueType:rd.revenueType||'Unknown', installType:rd.installType||'Unknown',
       bookingDate:rd.bookingDate||'', installDate:rd.installDate||'', tatDays,
       sheetFY:rd.sheetFY||'', sheetQ:rd.sheetQ||'',
-      bkCOGS:bk.cogs,bkOPEX:bk.opex,desCost:de,insCost:ins,
+      bkCOGS:bk.cogs,bkOPEX:bk.opex,desCost:de,insCost:ins,insOpex,
       bkGM,bkNM,deGM,insGM,insNM,compress:insNM!=null?bkNM-insNM:null});
   });
   return result.sort((a,b)=>b.revenue-a.revenue);
@@ -1187,17 +1218,18 @@ function getCatData(id){
     if(!cd||!p)return null;
     return{bk:cd.bk,bm:cd.bm,gn:cd.gn,revenue:p.revenue,bkCOGS:p.bkCOGS,bkOPEX:p.bkOPEX};
   }
-  let bk={},bm={},gn={},totalRev=0,totalBkCOGS=0,totalBkOPEX=0;
+  let bk={},bm={},gn={},totalRev=0,totalBkCOGS=0,totalBkOPEX=0,totalInsOpex=0;
   list.forEach(p=>{
     const cd=projCatData[p.id];if(!cd)return;
     totalRev+=p.revenue;totalBkCOGS+=p.bkCOGS;totalBkOPEX+=p.bkOPEX;
+    totalInsOpex+=(cd.insOpex||0);
     [...STD_CATS,'Others'].forEach(cat=>{
       bk[cat]=(bk[cat]||0)+(cd.bk[cat]||0);
       bm[cat]=(bm[cat]||0)+(cd.bm[cat]||0);
       gn[cat]=(gn[cat]||0)+(cd.gn[cat]||0);
     });
   });
-  return{bk,bm,gn,revenue:totalRev,bkCOGS:totalBkCOGS,bkOPEX:totalBkOPEX};
+  return{bk,bm,gn,revenue:totalRev,bkCOGS:totalBkCOGS,bkOPEX:totalBkOPEX,insOpex:totalInsOpex};
 }
 
 // Category cost totals for the currently filtered set (used by donut)
@@ -1222,10 +1254,12 @@ function renderJourney(id){
   const bkNM=(rv-cd.bkCOGS-cd.bkOPEX)/rv;
   const desCost=STD_CATS.reduce((s,c)=>s+(cd.bm[c]||0),0)+(cd.bm.Others||0);
   const insCost=STD_CATS.reduce((s,c)=>s+(cd.gn[c]||0),0)+(cd.gn.Others||0);
+  const insOpex=cd.insOpex||0;
   const deGM=desCost>0?(rv-desCost)/rv:null;
   const deNM=desCost>0?(rv-desCost-cd.bkOPEX)/rv:null;
   const insGM=insCost>0?(rv-insCost)/rv:null;
-  const insNM=insCost>0?(rv-insCost-cd.bkOPEX)/rv:null;
+  // NEW: Install NM = (Revenue - GRN COGS - Install Opex) / Revenue
+  const insNM=(insCost>0||insOpex>0)&&rv>0?(rv-insCost-insOpex)/rv:null;
   const d1=deGM!=null?deGM-bkGM:null;
   const d2=insGM!=null&&deGM!=null?insGM-deGM:insGM!=null?insGM-bkGM:null;
 
@@ -1261,6 +1295,7 @@ function renderJourney(id){
         <div class="journey-metric"><div class="journey-metric-val ${insGM!=null?'in':'na'}">${insGM!=null?pct(insGM,1):'—'}</div><div class="journey-metric-lbl">GM%</div></div>
         <div class="journey-metric"><div class="journey-metric-val ${insNM!=null?'in':'na'}">${insNM!=null?pct(insNM,1):'—'}</div><div class="journey-metric-lbl">NM%</div></div>
       </div>
+      ${insOpex>0?`<div style="margin-top:8px;font-size:10px;color:#15803d;font-weight:700">+Opex ${fmt(insOpex)}</div>`:''}
     </div>`;
 
   const pName=id==='__portfolio__'?'Portfolio (all projects)':
@@ -2092,6 +2127,7 @@ function openDetail(idx){
     {l:'Booking OPEX',v:fmt(p.bkOPEX),s:`NM: ${(p.bkNM*100).toFixed(1)}%`,c:'#8b5cf6'},
     {l:'Design (BOM)',v:p.desCost>0?fmt(p.desCost):'No data',s:p.deGM!=null?`GM: ${(p.deGM*100).toFixed(1)}%`:'—',c:'#f59e0b'},
     {l:'Install (GRN)',v:p.insCost>0?fmt(p.insCost):'Pending',s:p.insGM!=null?`GM: ${(p.insGM*100).toFixed(1)}%`:'—',c:'#22c55e'},
+    {l:'Install Opex',v:p.insOpex>0?fmt(p.insOpex):'No data',s:p.insNM!=null?`NM: ${(p.insNM*100).toFixed(1)}%`:'—',c:'#10b981'},
     {l:'NM Compression',v:p.compress!=null?pp(p.compress):'—',
       s:p.compress!=null?(p.compress>0.05?'⚠ Overrun':p.compress<0?'✓ Under budget':'Within range'):'—',
       c:p.compress>0.05?'#dc2626':p.compress<0?'#16a34a':'#64748b'},
@@ -2133,12 +2169,13 @@ async function loadData(){
     Booking:'Booking sheet (costs & targets)',
     BOM:'BOM sheet (design estimates)',
     GRN:'GRN sheet (actual install costs)',
+    'Install opex':'Install opex sheet (I&C + labour)',
     Process:'Computing margins…'
   };
   Object.keys(stepLabels).forEach(k=>setStep(k,'pending',stepLabels[k]));
 
   const sheets={};
-  const sheetKeys=['Revenue','Booking','BOM','GRN'];
+  const sheetKeys=['Revenue','Booking','BOM','GRN','Install opex'];
   let anyFailed=false,errMsgs=[];
 
   for(const key of sheetKeys){
@@ -2178,7 +2215,8 @@ async function loadData(){
       sheets.Revenue,
       sheets.Booking,
       sheets.BOM||[],
-      sheets.GRN||[]
+      sheets.GRN||[],
+      sheets['Install opex']||[]
     );
     if(!projects.length) throw new Error('No matching project data (check SSEID values in Revenue sheet)');
 
@@ -3273,10 +3311,13 @@ function mkp(id,name,kwp,rev,opxR,bk,bm,gn){
   const bkOPEX=rev*opxR;
   const desCost=Object.values(bm).reduce((s,v)=>s+v,0);
   const insCost=Object.values(gn).reduce((s,v)=>s+v,0);
-  projCatData[id]={bk,bm,gn,revenue:rev,bkCOGS,bkOPEX};
+  // Demo install opex: ~8% of GRN cost (I&C + labour proxy)
+  const insOpex=Math.round(insCost*0.08);
+  projCatData[id]={bk,bm,gn,revenue:rev,bkCOGS,bkOPEX,insOpex};
   const bkGM=(rev-bkCOGS)/rev,bkNM=(rev-bkCOGS-bkOPEX)/rev;
-  const insNM=(rev-insCost-bkOPEX)/rev;
-  return{id,name,kwp,revenue:rev,bkCOGS,bkOPEX,desCost,insCost,
+  // NEW: Install NM = (Revenue - GRN COGS - Install Opex) / Revenue
+  const insNM=(rev-insCost-insOpex)/rev;
+  return{id,name,kwp,revenue:rev,bkCOGS,bkOPEX,desCost,insCost,insOpex,
     bkGM,bkNM,deGM:(rev-desCost)/rev,insGM:(rev-insCost)/rev,insNM,
     compress:bkNM-insNM};
 }
