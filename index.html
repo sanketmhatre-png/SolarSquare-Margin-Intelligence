@@ -629,10 +629,12 @@ tr:hover td{background:#fafbfc}
               <th onclick="sortBy('kwp')" data-col="kwp" class="t-r">KWp</th>
               <th onclick="sortBy('revenue')" data-col="revenue" class="t-r">Revenue</th>
               <th onclick="sortBy('bkGM')" data-col="bkGM" class="t-r">📋 Bk-GM%</th>
+              <th onclick="sortBy('bkNM')" data-col="bkNM" class="t-r">📋 Bk-NM%</th>
               <th onclick="sortBy('bkGMabs')" data-col="bkGMabs" class="t-r">Bk-GM ₹</th>
               <th onclick="sortBy('deGM')" data-col="deGM" class="t-r">📐 De-GM%</th>
               <th onclick="sortBy('deGMabs')" data-col="deGMabs" class="t-r">De-GM ₹</th>
               <th onclick="sortBy('instGM')" data-col="instGM" class="t-r">🔧 In-GM%</th>
+              <th onclick="sortBy('insNM')" data-col="insNM" class="t-r">🔧 In-NM%</th>
               <th onclick="sortBy('insGMabs')" data-col="insGMabs" class="t-r">In-GM ₹</th>
               <th onclick="sortBy('dBkDe')" data-col="dBkDe" class="t-r">Δ Bk→De</th>
               <th onclick="sortBy('dDeIn')" data-col="dDeIn" class="t-r">Δ De→In</th>
@@ -1989,6 +1991,8 @@ function renderTable(){
       insGMabs:[a.insGM!=null?a.revenue-a.insCost:0,b.insGM!=null?b.revenue-b.insCost:0],
       dBkDe:[dBkDeA,dBkDeB],dDeIn:[dDeInA,dDeInB],
       tat:[a.tatDays||0,b.tatDays||0],
+      bkNM:[a.bkNM||0,b.bkNM||0],
+      insNM:[a.insNM||0,b.insNM||0],
       name:[a.name,b.name]}[sortCol]||[a.revenue,b.revenue];
     return typeof v[0]==='string'?sortDir*v[0].localeCompare(v[1]):sortDir*(v[0]-v[1]);
   });
@@ -2010,10 +2014,12 @@ function renderTable(){
       <td class="t-r">${p.kwp.toFixed(1)}</td>
       <td class="t-r">${fmt(p.revenue)}</td>
       <td class="t-r">${mc(p.bkGM,'#3b82f6')}</td>
+      <td class="t-r">${mc(p.bkNM,'#8b5cf6')}</td>
       <td class="t-r">${fmtAbs(bkGMabs)}</td>
       <td class="t-r">${p.deGM!=null?mc(p.deGM,'#f59e0b'):'<span style="color:#94a3b8;font-size:11px">No BOM</span>'}</td>
       <td class="t-r">${p.deGM!=null?fmtAbs(deGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
       <td class="t-r">${p.insGM!=null?mc(p.insGM,'#22c55e'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
+      <td class="t-r">${p.insNM!=null?mc(p.insNM,'#10b981'):'<span style="color:#94a3b8;font-size:11px">Pending</span>'}</td>
       <td class="t-r">${p.insGM!=null?fmtAbs(insGMabs):'<span style="color:#94a3b8;font-size:11px">—</span>'}</td>
       <td class="t-r">${dHtml(dBkDe)}</td>
       <td class="t-r">${dHtml(dDeIn)}</td>
