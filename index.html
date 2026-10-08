@@ -1,4 +1,4 @@
-=<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1160,6 +1160,7 @@ function processData(rev,booking,bom,grn,installOpex){
     const amt=getAmt(r);
     insOpexMap[id]=(insOpexMap[id]||0)+amt;
   });
+  console.log(`[DEBUG] Install OPEX: ${installOpex.length} rows, ${Object.keys(insOpexMap).length} projects matched, total ₹${Object.values(insOpexMap).reduce((s,v)=>s+v,0).toLocaleString()}`);
   catCosts=catTotals;
   // Build sorted availableMonths — prefer Revenue "Installation Month", fallback to GRN dates
   const monthSource=Object.keys(projByInstallMonth).length>0
@@ -1218,7 +1219,7 @@ function getCatData(id){
   list.forEach(p=>{
     const cd=projCatData[p.id];if(!cd)return;
     totalRev+=p.revenue;totalBkCOGS+=p.bkCOGS;totalBkOPEX+=p.bkOPEX;
-    totalInsOPEX+=(cd.insOPEX||0);
+    totalInsOPEX+=(p.insOPEX||0);
     [...STD_CATS,'Others'].forEach(cat=>{
       bk[cat]=(bk[cat]||0)+(cd.bk[cat]||0);
       bm[cat]=(bm[cat]||0)+(cd.bm[cat]||0);
