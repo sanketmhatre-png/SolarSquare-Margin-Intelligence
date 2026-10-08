@@ -1239,14 +1239,17 @@ function processData(rev,booking,bom,grn,installOpex){
   const ioCols=installOpex&&installOpex.length?Object.keys(installOpex[0]):[];
   const findIO=(...tests)=>ioCols.find(c=>tests.some(t=>t(c.toLowerCase().trim())))||null;
   const ioProjCol=findIO(c=>c==='project',c=>c==='sseid',c=>c.includes('project'));
-  const ioAmtCol =findIO(c=>c.startsWith('amount (company currency)'),c=>c==='amount',c=>c.includes('amount'));
+  // Column S "Amount" is primary; column N "Amount (Company Currency)…" is only a per-row fallback
+  const ioAmtCol =findIO(c=>c==='amount',c=>c.includes('amount')&&!c.includes('company'));
+  const ioAmtCol2=findIO(c=>c.startsWith('amount (company currency)'));
   const ioNameCol=findIO(c=>c.startsWith('item name'));
   const unmatched=new Set();
   (installOpex||[]).forEach(r=>{
     const raw=ioProjCol?r[ioProjCol]:'';
     const id=revByNorm[normId(raw)];
     if(!id){if(raw)unmatched.add(String(raw).trim());return;}
-    const amt=num(ioAmtCol?r[ioAmtCol]:0);
+    const vS=ioAmtCol?String(r[ioAmtCol]??'').trim():'';
+    const amt=num(vS!==''?vS:(ioAmtCol2?r[ioAmtCol2]:0));
     if(!amt)return;
     instOpexMap[id]=(instOpexMap[id]||0)+amt;
     const cat=(r.Category||r.Type||'I&C').toString().trim();
@@ -1254,8 +1257,8 @@ function processData(rev,booking,bom,grn,installOpex){
     window._instOpexLineData.push({sseid:id,itemName,cat,amt,kwp:revMap[id].kwp,date:r.Date||''});
   });
   window._instOpexMap=instOpexMap;
-  window._instOpexCols={project:ioProjCol,amount:ioAmtCol};
-  console.log(`💸 Install opex → project col:"${ioProjCol}" amount col:"${ioAmtCol}" · ${Object.keys(instOpexMap).length} projects matched`);
+  window._instOpexCols={project:ioProjCol,amount:ioAmtCol,fallback:ioAmtCol2};
+  console.log(`💸 Install opex → project col:"${ioProjCol}" amount col:"${ioAmtCol}" (fallback "${ioAmtCol2}") · ${Object.keys(instOpexMap).length} projects matched`);
   if(unmatched.size)console.warn(`⚠ ${unmatched.size} Install opex project IDs not in Revenue sheet:`,[...unmatched].slice(0,30));
 
   // Build sorted availableMonths — prefer Revenue "Installation Month", fallback to GRN dates
@@ -2509,6 +2512,10 @@ window.showProjectReview=function(id){
         else add('ok','Install opex in line with booked I&C',`Actual ${R(p.insOpex)} vs booked I&C ${R(bkIC)}.`);
       }else add('info','Install opex recorded',`${R(p.insOpex)} across ${ioL.length} service order line(s); no I&C line in booking to compare against.`);
     }
+    // Same amount entered more than once in Install opex
+    const ioSeen={},ioDup=[];
+    ioL.forEach(x=>{const k=Math.round(x.amt*100);if(ioSeen[k])ioDup.push(x);ioSeen[k]=1;});
+    if(ioDup.length)add('warn','Possible duplicate Install opex entries',`${ioDup.length} Install opex line(s) repeat an amount already entered for this project (${ioDup.map(x=>R(x.amt)).join(', ')}).`,'Check the Install opex sheet — if it is the same service order entered twice, Install opex is overstated and Install NM understated.');
     // NM comparability
     if(bkOtherOpex>0)add('info','Install NM excludes non-install opex',`Booking NM deducts ${R(bkOtherOpex)} of other opex (CAC, contingency, finance…) that Install NM does not.`,`Like-for-like Install NM = ${P(inNMl4l)} (vs ${P(inNM)} shown), so true NM movement is ${PP(inNMl4l-bkNM)}.`);
   }
