@@ -548,8 +548,14 @@ tr:hover td{background:#fafbfc}
         </div>
         <!-- RIGHT: QoQ GM% Table -->
         <div style="border-left:1px solid var(--bdr);padding-left:24px">
-          <div style="font-size:13px;font-weight:700;color:var(--dark);margin-bottom:6px">
-            📈 Quarter on Quarter — Booking vs Design vs Install GM%
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+            <div style="font-size:13px;font-weight:700;color:var(--dark)">
+              📈 Quarter on Quarter — Booking vs Design vs Install <span id="qoqMetricLbl">GM%</span>
+            </div>
+            <div style="display:inline-flex;border:1px solid var(--bdr);border-radius:7px;overflow:hidden">
+              <button id="qoqBtnGM" onclick="setQoQMode('gm')" style="border:none;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;background:var(--teal);color:#fff">GM%</button>
+              <button id="qoqBtnNM" onclick="setQoQMode('nm')" style="border:none;padding:4px 14px;font-size:12px;font-weight:700;cursor:pointer;background:#fff;color:var(--text)">NM%</button>
+            </div>
           </div>
           <div id="qoqGMTableSection"><table class="bdt" style="width:100%"><tbody><tr><td colspan="6" style="color:var(--textl);padding:14px">Loading…</td></tr></tbody></table></div>
           <div style="font-size:10px;color:var(--textl);margin-top:8px">Revenue-weighted avg · same filters as TAT above</div>
@@ -2847,6 +2853,27 @@ function renderProjComparison(){
 // ═══════════════════════════════════════════
 // QoQ GM% TABLE — right panel (same cat filters as TAT)
 // ═══════════════════════════════════════════
+// GM / NM toggle for the QoQ table
+let qoqMode='gm';
+window.setQoQMode=function(mode){
+  qoqMode=mode;
+  const on={background:'var(--teal)',color:'#fff'},off={background:'#fff',color:'var(--text)'};
+  Object.assign(document.getElementById('qoqBtnGM').style,mode==='gm'?on:off);
+  Object.assign(document.getElementById('qoqBtnNM').style,mode==='nm'?on:off);
+  document.getElementById('qoqMetricLbl').textContent=mode==='gm'?'GM%':'NM%';
+  renderQoQGMPanel();
+};
+// Stage metric for a project: GM or NM
+//   Booking NM = (Rev − Bk COGS − Bk OPEX) / Rev
+//   Design  NM = (Rev − BOM COGS − Bk OPEX) / Rev   (same as stage banner)
+//   Install NM = (Rev − GRN COGS − Install Opex) / Rev
+function qoqMetric(p,stage){
+  if(qoqMode==='gm')return stage==='bk'?p.bkGM:stage==='de'?p.deGM:p.insGM;
+  if(stage==='bk')return p.bkNM;
+  if(stage==='de')return p.desCost>0&&p.revenue>0?(p.revenue-p.desCost-p.bkOPEX)/p.revenue:null;
+  return p.insNM;
+}
+
 function renderQoQGMPanel(){
   const el=document.getElementById('qoqGMTableSection');
   if(!el)return;
@@ -2890,23 +2917,25 @@ function renderQoQGMPanel(){
 
   if(!periods.length){el.innerHTML='<div style="color:var(--textl);padding:14px;font-size:12px">No data</div>';return;}
 
-  function wmGM(ps,key){
-    const v=ps.filter(p=>p[key]!=null);
+  function wmGM(ps,stage){
+    const v=ps.filter(p=>qoqMetric(p,stage)!=null);
     const r=v.reduce((s,p)=>s+p.revenue,0);
-    return r>0?+(v.reduce((s,p)=>s+p[key]*p.revenue,0)/r*100).toFixed(1):null;
+    return r>0?+(v.reduce((s,p)=>s+qoqMetric(p,stage)*p.revenue,0)/r*100).toFixed(1):null;
   }
+  // Colour bands: GM ≥30 / ≥20 ; NM ≥15 / ≥8
+  const [hi,mid]=qoqMode==='gm'?[30,20]:[15,8];
   function gmCell(v,col){
     if(v==null)return`<td style="text-align:center;color:var(--textl)">—</td>`;
-    const c=v>=30?'var(--g)':v>=20?'#d97706':'var(--r)';
+    const c=v>=hi?'var(--g)':v>=mid?'#d97706':'var(--r)';
     return`<td style="text-align:center;font-weight:700;color:${c}">${v}%</td>`;
   }
 
   const rows=periods.map(period=>{
     const ps=periodMap[period];
     const n=ps.length;
-    const bk=wmGM(ps,'bkGM');
-    const de=wmGM(ps,'deGM');
-    const ins=wmGM(ps,'insGM');
+    const bk=wmGM(ps,'bk');
+    const de=wmGM(ps,'de');
+    const ins=wmGM(ps,'in');
     const delta=bk!=null&&ins!=null?+(ins-bk).toFixed(1):null;
     const dCol=delta==null?'var(--textl)':delta>=0?'var(--g)':'var(--r)';
     return`<tr>
@@ -2919,13 +2948,14 @@ function renderQoQGMPanel(){
     </tr>`;
   }).join('');
 
+  const M=qoqMode==='gm'?'GM%':'NM%';
   el.innerHTML=`<table class="bdt" style="width:100%">
     <thead><tr>
       <th style="text-align:left">Quarter</th>
       <th>Projects</th>
-      <th style="color:#3b82f6">Booking GM%</th>
-      <th style="color:#b45309">Design GM%</th>
-      <th style="color:#15803d">Install GM%</th>
+      <th style="color:#3b82f6">Booking ${M}</th>
+      <th style="color:#b45309">Design ${M}</th>
+      <th style="color:#15803d">Install ${M}</th>
       <th>Δ Bk→In</th>
     </tr></thead>
     <tbody>${rows}</tbody>
