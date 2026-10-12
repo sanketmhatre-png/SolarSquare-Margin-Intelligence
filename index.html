@@ -190,6 +190,7 @@ html,body{overflow-x:hidden}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-bottom:22px}
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px;margin-bottom:22px}
 .g2 .wide,.g3 .wide{grid-column:1/-1}
+.g2>*,.g3>*,.split2>*{min-width:0}
 .split2{display:grid;grid-template-columns:1fr 1fr;gap:28px;align-items:start}
 .split2>div+div{border-left:1px solid var(--line);padding-left:28px}
 
@@ -397,10 +398,42 @@ td.kpi-click:hover{background:#DCE8FF!important;box-shadow:inset 0 0 0 1.5px #7F
 .load-step-icon{font-size:14px;width:18px;text-align:center}
 .err-banner{background:var(--rl);border:1px solid #F6CACC;border-radius:14px;padding:13px 16px;color:#7F1D1D;font-size:13px;margin-bottom:20px}
 
+/* ═══════════════ TABS ═══════════════ */
+.tabbar{display:inline-flex;gap:6px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:16px;
+  box-shadow:0 1px 0 #fff inset,0 4px 0 #E1E8F3,0 14px 26px -18px rgba(31,59,115,.4);margin-bottom:20px;flex-wrap:wrap}
+.tab{padding:10px 18px;border-radius:11px;font-weight:700;font-size:13.5px;color:var(--textl);cursor:pointer;border:none;background:transparent;
+  display:flex;gap:8px;align-items:center;transition:background .15s,color .15s,transform .1s}
+.tab:hover{color:var(--ink);background:#F2F6FC}
+.tab.active{background:linear-gradient(180deg,#2F5BDA,#1F3B9C);color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.3) inset,0 3px 0 #142A75,0 10px 18px -10px rgba(31,59,115,.7)}
+.tab:active{transform:translateY(1px)}
+.tab .cnt{border-radius:999px;padding:1px 8px;font-size:11.5px;background:#EEF2F8;color:var(--ink)}
+.tab.active .cnt{background:rgba(255,255,255,.2);color:#fff}
+
+/* ═══════════════ FY BUCKET TAB ═══════════════ */
+.bk-hero{position:relative;border-radius:24px;padding:24px 26px;margin-bottom:22px;overflow:hidden;isolation:isolate;
+  background:radial-gradient(600px 300px at 95% -20%,rgba(16,185,129,.20),transparent 60%),
+             radial-gradient(600px 300px at -5% 120%,rgba(31,79,209,.16),transparent 60%),
+             linear-gradient(170deg,#FFFFFF 0%,#F3F9F6 60%,#EAF4FF 100%);
+  border:1px solid #DCE8EE;box-shadow:0 1px 0 #fff inset,0 26px 50px -34px rgba(31,59,115,.45)}
+.bk-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.bk-title{font-family:var(--fd);font-size:clamp(20px,2vw,28px);font-weight:600;color:var(--ink);letter-spacing:-.02em}
+.bk-sub{font-size:13px;color:var(--textl);margin-top:6px;max-width:70ch}
+.bk-funnel{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px}
+.bk-step{display:flex;align-items:baseline;gap:8px;padding:10px 14px;border-radius:14px;background:#fff;border:1px solid var(--line);box-shadow:0 3px 0 #E1E8F3}
+.bk-step b{font-family:var(--fd);font-size:20px;font-weight:600;color:var(--ink)}
+.bk-step span{font-size:12.5px;color:var(--textl);font-weight:600}
+.bk-step.ok b{color:#0A8A5E}.bk-step.pend b{color:#B26A00}
+.bk-arrow{color:#9AA8C2;font-size:18px}
+.bk-progress{flex:1;min-width:200px;height:12px;border-radius:999px;background:#E6ECF5;overflow:hidden;box-shadow:inset 0 1px 2px rgba(10,26,58,.12)}
+.bk-progress>div{height:100%;border-radius:999px;background:linear-gradient(90deg,#10B981,#22C08A);box-shadow:0 0 12px rgba(16,185,129,.5)}
+.heat td.hc{text-align:center!important;font-weight:800;min-width:56px}
+.bk-tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:#FFF1D6;color:#8A5300}
+.bk-row{cursor:pointer}
+
 /* ═══════════════ RESPONSIVE / MOTION ═══════════════ */
 @media(max-width:1500px){body{font-size:13px}.bdt,table{font-size:12.5px}.bdt td,.bdt th,td,th{padding:9px 10px}
   .kpi-val{font-size:24px}.journey-metric-val{font-size:26px}.hero{padding:24px}}
-@media(max-width:1280px){.bdt,table{font-size:12px}.bdt td,.bdt th,td,th{padding:8px 8px}.kpi-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1280px){.bdt,table{font-size:12px}.bdt td,.bdt th,td,th{padding:8px 8px}}
 @media(max-width:1100px){.g2,.g3,.split2{grid-template-columns:1fr}.g2 .wide,.g3 .wide{grid-column:1}
   .split2>div+div{border-left:none;padding-left:0;border-top:1px solid var(--line);padding-top:20px}}
 @media(max-width:900px){.perf-grid,.pr-2col{grid-template-columns:1fr}
@@ -412,6 +445,91 @@ td.kpi-click:hover{background:#DCE8FF!important;box-shadow:inset 0 0 0 1.5px #7F
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}
   .journey-stage{transform:none}}
 :fullscreen body,body:fullscreen{overflow:auto}
+
+/* ═══════════════ COMPACT DENSITY (fits more on screen, less "zoomed") ═══════════════ */
+body{font-size:13px}
+.hdr{height:54px;padding:0 20px}
+.filter-subbar{top:54px}
+.filter-subbar-inner{padding:6px 20px}
+.hdr-logo svg{width:52px;height:24px}
+.hdr-title{font-size:15px}
+.btn{padding:6px 12px;font-size:12.5px}
+.hdr-filter-sel{padding:5px 24px 5px 9px;font-size:12px;min-width:104px}
+.main{padding:14px clamp(10px,1.3vw,22px)}
+.tabbar{margin-bottom:14px;padding:4px}
+.tab{padding:7px 14px;font-size:13px}
+
+.hero,.bk-hero{padding:18px 22px 18px;border-radius:22px;margin-bottom:16px}
+.hero-head,.bk-head{margin-bottom:14px}
+.hero-kicker{margin-bottom:4px;font-size:12px}
+.hero-title{font-size:clamp(20px,1.6vw,26px);max-width:none}
+.bk-title{font-size:clamp(18px,1.5vw,24px)}
+.hero-sub,.bk-sub{font-size:12.5px;margin-top:4px}
+.hero-sun{width:150px;height:150px;top:-70px;right:16%}
+.hero-meta{padding:7px 12px}
+.hero-meta-val{font-size:14px}
+
+.kpi-grid{gap:12px;margin-bottom:14px}
+.kpi{padding:12px 14px 13px;border-radius:15px}
+.kpi::before{left:14px;right:14px}
+.kpi-val{font-size:22px;margin-top:3px}
+.kpi-sub{margin-top:3px;font-size:11.5px}
+.kpi-badge{margin-top:6px;font-size:11px}
+.kpi-comp{font-size:11.5px;margin-top:4px}
+
+.hero .chart-card{padding:14px 18px}
+.hero .sec-hdr{margin-bottom:8px}
+.journey-grid{padding:2px 2px 10px}
+.journey-stage{padding:12px 14px 12px;transform:rotateX(6deg)}
+.journey-icon{font-size:17px;margin-bottom:2px}
+.journey-title{font-size:13px;margin-bottom:6px}
+.journey-metrics{gap:24px}
+.journey-metric-val{font-size:24px}
+.journey-metric-lbl{font-size:11px;margin-top:3px}
+.journey-opex{margin-top:5px}
+.journey-stage.bk{box-shadow:0 1px 0 rgba(255,255,255,.45) inset,0 6px 0 #1A3690,0 20px 24px -14px rgba(31,59,115,.55)}
+.journey-stage.de{box-shadow:0 1px 0 rgba(255,255,255,.5) inset,0 6px 0 #B8650A,0 20px 24px -14px rgba(184,101,10,.5)}
+.journey-stage.in{box-shadow:0 1px 0 rgba(255,255,255,.45) inset,0 6px 0 #0A6A4C,0 20px 24px -14px rgba(10,106,76,.5)}
+
+.chart-card,.bdt-card,.tbl-card,.detail-panel{padding:16px 18px;border-radius:18px}
+.mb-20{margin-bottom:16px}
+.g2,.g3{gap:16px;margin-bottom:16px}
+.sec-hdr{margin-bottom:12px}
+.sec-title{font-size:15px}
+.sec-sub{font-size:12px}
+.bdt,table{font-size:12.5px}
+.bdt td,.bdt th,td,th{padding:8px 10px}
+.fsel{padding:6px 28px 6px 10px;font-size:12px}
+.bk-funnel{margin-bottom:12px}
+.bk-step{padding:7px 12px}.bk-step b{font-size:17px}
+
+@media(max-width:1500px){.kpi-val{font-size:20px}.journey-metric-val{font-size:21px}.bdt,table{font-size:12px}}
+
+/* KPI cards: always one row of six on laptop/desktop, like the original layout */
+@media(min-width:900px){.kpi-grid{grid-template-columns:repeat(6,minmax(0,1fr))!important}}
+@media(max-width:1400px){.kpi{padding:11px 12px 12px}.kpi-lbl{font-size:11.5px}.kpi-val{font-size:19px}
+  .kpi-sub{font-size:11px}.kpi-badge{font-size:10.5px;padding:2px 7px}.kpi-grid{gap:10px}}
+@media(max-width:1100px){.kpi-val{font-size:17px}.kpi-lbl span,.kpi span[style*="font-size:18px"]{font-size:15px!important}}
+
+/* Smaller header + filter bar */
+.hdr{height:48px;padding:0 18px}
+.filter-subbar{top:48px}
+.filter-subbar-inner{padding:5px 18px;gap:6px}
+.hdr-logo{padding:3px 7px}.hdr-logo svg{width:46px;height:21px}
+.hdr-title{font-size:14px}.hdr-sub{font-size:11px}
+.hdr-status{font-size:11px;padding:4px 10px}
+.btn{padding:5px 10px;font-size:11.5px;border-radius:8px}
+.hdr-filter-label{font-size:11px}
+.hdr-filter-sel{font-size:11.5px;padding:3px 22px 3px 8px;min-width:96px;border-radius:7px;background-position:right 6px center}
+.hdr-filter-divider{height:18px;margin:0 2px}
+.hdr-filter-badge{font-size:10.5px;padding:3px 9px}
+.hdr-clear-btn{font-size:11px;padding:3px 9px}
+.btn-export{font-size:11.5px;padding:5px 12px;border-radius:8px}
+.tab{padding:6px 12px;font-size:12px}
+.tab .cnt{font-size:10.5px}
+.fsel,.wf-select,select.tbl-sort{font-size:11.5px;padding:5px 26px 5px 9px}
+.flt-lbl{font-size:11px}
+.tbl-search{font-size:12px;padding:7px 12px}
 </style>
 </head>
 <body>
@@ -490,6 +608,7 @@ td.kpi-click:hover{background:#DCE8FF!important;box-shadow:inset 0 0 0 1.5px #7F
       <div class="load-step" id="ls-BOM"><span class="load-step-icon">⏳</span>BOM sheet (design estimates)</div>
       <div class="load-step" id="ls-GRN"><span class="load-step-icon">⏳</span>GRN sheet (actual install costs)</div>
       <div class="load-step" id="ls-Install opex"><span class="load-step-icon">⏳</span>Install opex sheet (I&amp;C + labour)</div>
+      <div class="load-step" id="ls-FY-26-27 bucket"><span class="load-step-icon">⏳</span>FY-26-27 bucket sheet</div>
       <div class="load-step" id="ls-Process"><span class="load-step-icon">⏳</span>Computing margins…</div>
     </div>
   </div>
@@ -502,6 +621,13 @@ td.kpi-click:hover{background:#DCE8FF!important;box-shadow:inset 0 0 0 1.5px #7F
   </div>
 
   <div id="appContent" style="display:none">
+
+    <nav class="tabbar" role="tablist">
+      <button class="tab active" id="tabBtnOverview" role="tab" onclick="switchTab('overview')">📊 Portfolio overview <span class="cnt" id="tabCntOverview">—</span></button>
+      <button class="tab" id="tabBtnBucket" role="tab" onclick="switchTab('bucket')">🗂 FY 26-27 bucket · installed <span class="cnt" id="tabCntBucket">—</span></button>
+    </nav>
+
+    <div id="tabOverview">
 
     <!-- ═══ HERO: KPIs + 3D STAGE JOURNEY ═══ -->
     <section class="hero" id="hero">
@@ -543,7 +669,7 @@ td.kpi-click:hover{background:#DCE8FF!important;box-shadow:inset 0 0 0 1.5px #7F
           <div class="wf-leg"><div class="wf-dot" style="background:#0E9F6E"></div>Margin gain (cost down)</div>
           <div class="wf-leg"><div class="wf-dot" style="background:#E5484D"></div>Margin loss (cost up)</div>
         </div>
-        <div class="chart-box" style="height:380px"><canvas id="chartWF"></canvas></div>
+        <div class="chart-box" style="height:clamp(260px,34vh,340px)"><canvas id="chartWF"></canvas></div>
       </div>
     </div>
 
@@ -721,6 +847,52 @@ td.kpi-click:hover{background:#DCE8FF!important;box-shadow:inset 0 0 0 1.5px #7F
       <div id="tblFooter" style="margin-top:10px;font-size:12px;color:var(--textl);text-align:right"></div>
       <div id="perfCards" style="margin-top:22px"></div>
     </div>
+
+    </div><!-- /tabOverview -->
+
+    <!-- ═══════════ FY 26-27 BUCKET TAB ═══════════ -->
+    <div id="tabBucket" style="display:none">
+      <section class="bk-hero">
+        <div class="bk-head">
+          <div>
+            <div class="hero-kicker"><span class="live-dot"></span>FY 26-27 bucket</div>
+            <div class="bk-title">Installed projects from the FY 26-27 booking bucket</div>
+            <div class="bk-sub">Only projects with an installed date in the “FY-26-27 bucket” sheet, matched to Revenue, Booking, BOM and GRN on SSEID. City and revenue type filters above also apply.</div>
+          </div>
+          <div class="flt-row">
+            <div class="flt"><span class="flt-lbl">Booking month</span><select id="bkFltBM" class="fsel" onchange="renderBucket()"><option value="all">All</option></select></div>
+            <div class="flt"><span class="flt-lbl">Installed month</span><select id="bkFltIM" class="fsel" onchange="renderBucket()"><option value="all">All</option></select></div>
+          </div>
+        </div>
+        <div class="bk-funnel" id="bkFunnel"></div>
+        <div class="kpi-grid" id="bkKpis" style="margin-bottom:0"></div>
+      </section>
+
+      <div class="g2">
+        <div class="bdt-card">
+          <div class="sec-hdr"><div><div class="sec-title">📅 By booking month</div><div class="sec-sub">How each booking cohort is converting to installs, and at what margin</div></div></div>
+          <div style="overflow-x:auto"><table class="bdt" id="bkCohortTbl"></table></div>
+        </div>
+        <div class="bdt-card">
+          <div class="sec-hdr"><div><div class="sec-title">🔧 By installed month</div><div class="sec-sub">Install volume and margin for each month of installation</div></div></div>
+          <div style="overflow-x:auto"><table class="bdt" id="bkInstTbl"></table></div>
+        </div>
+      </div>
+
+      <div class="bdt-card mb-20">
+        <div class="sec-hdr"><div><div class="sec-title">🧭 Booking month → installed month</div><div class="sec-sub">Number of installed projects in each booking-to-install combination; darker means more projects</div></div></div>
+        <div style="overflow-x:auto"><table class="bdt heat" id="bkHeatTbl"></table></div>
+      </div>
+
+      <div class="tbl-card">
+        <div class="sec-hdr">
+          <div><div class="sec-title">Installed projects</div><div class="sec-sub">Click a project for its full booking vs install review</div></div>
+          <input class="tbl-search" id="bkSearch" style="max-width:320px" placeholder="🔍  Search by project name or SSEID" oninput="renderBucket()">
+        </div>
+        <div class="tbl-wrap"><table id="bkProjTbl"></table></div>
+        <div id="bkFoot" style="margin-top:10px;font-size:12px;color:var(--textl);text-align:right"></div>
+      </div>
+    </div><!-- /tabBucket -->
 
   </div>
 </div>
@@ -1702,6 +1874,7 @@ function renderAll_filters(){
   renderWaterfall(selectedProjectId);
   renderCatImpact(selectedProjectId);
   renderTable();
+  renderBucket();
 }
 
 // ═══════════════════════════════════════════
@@ -2443,12 +2616,13 @@ async function loadData(){
     BOM:'BOM sheet (design estimates)',
     GRN:'GRN sheet (actual install costs)',
     'Install opex':'Install opex sheet (I&C + labour)',
+    'FY-26-27 bucket':'FY-26-27 bucket sheet',
     Process:'Computing margins…'
   };
   Object.keys(stepLabels).forEach(k=>setStep(k,'pending',stepLabels[k]));
 
   const sheets={};
-  const sheetKeys=['Revenue','Booking','BOM','GRN','Install opex'];
+  const sheetKeys=['Revenue','Booking','BOM','GRN','Install opex','FY-26-27 bucket'];
   let anyFailed=false,errMsgs=[];
 
   for(const key of sheetKeys){
@@ -2483,6 +2657,8 @@ async function loadData(){
     await new Promise(r=>setTimeout(r,100));
     projects=processData(sheets.Revenue,sheets.Booking,sheets.BOM||[],sheets.GRN||[],sheets['Install opex']||[]);
     if(!projects.length) throw new Error('No matching project data (check SSEID values in Revenue sheet)');
+    window._bucket=processBucket(sheets['FY-26-27 bucket']||[]);
+    window._bucketLoaded=!!sheets['FY-26-27 bucket'];
     setStep('Process','done',`✓ ${projects.length} projects computed`);
     // Show content before rendering so charts measure their real size
     document.getElementById('loadingState').style.display='none';
@@ -3197,6 +3373,7 @@ function renderAll(){
   renderDonut();
   renderKwp();
   renderTable();
+  renderBucket();
 }
 
 // ═══════════════════════════════════════════
@@ -3391,7 +3568,213 @@ function loadDemoData(){
   // demo GRN totals by category so the cost table has something to show
   projects.forEach(p=>{window._rawGrnByCat[p.id]={...projCatData[p.id].gn};});
   catCosts={MODULE:14200000,INVERTER:3550000,MMS:7050000,CABLING:2145000,'INFRA BOS':2535000,'OTHER BOS':3165000,Others:773000};
+  const demoIM=['1-Jun-26','','17-Jun-26','4-Aug-26','','1-Jul-26','9-May-26','','14-Aug-26','1-Jul-26','',''];
+  const demoBM=['26-Apr','26-Apr','26-Apr','26-Apr','26-Apr','26-Apr','26-Apr','26-Jun','26-Jun','26-Jul','26-Jul','26-Jul'];
+  window._bucket=processBucket(projects.map((p,i)=>({'Booking Month':demoBM[i],'Booking Name':p.name,'SSEID':p.id,'Installed month':demoIM[i]})));
+  window._bucketLoaded=true;
   renderAll();
+}
+
+// ═══════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════
+let activeTab='overview';
+window.switchTab=function(tab){
+  activeTab=tab;
+  document.getElementById('tabOverview').style.display=tab==='overview'?'':'none';
+  document.getElementById('tabBucket').style.display=tab==='bucket'?'':'none';
+  document.getElementById('tabBtnOverview').classList.toggle('active',tab==='overview');
+  document.getElementById('tabBtnBucket').classList.toggle('active',tab==='bucket');
+  if(tab==='bucket')renderBucket();
+  window.scrollTo({top:0,behavior:'smooth'});
+  if(window.fitTables)setTimeout(window.fitTables,30);
+  window.dispatchEvent(new Event('resize'));   // lets charts re-measure after being hidden
+};
+
+// ═══════════════════════════════════════════
+// FY 26-27 BUCKET — sheet columns: Booking Month · Booking Name · SSEID · Installed month
+// ═══════════════════════════════════════════
+const _MON={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function _bkMk(d){
+  if(!d||isNaN(d.getTime()))return null;
+  return{ms:d.getTime(),ym:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`};
+}
+function parseBucketDate(v){
+  if(v==null)return null;
+  const s=String(v).trim();if(!s)return null;
+  let m=s.match(/^Date\((\d+),(\d+),(\d+)/);                       // gviz Date(2026,5,1)
+  if(m)return _bkMk(new Date(+m[1],+m[2],+m[3]));
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);                             // 2026-06-01
+  if(m)return _bkMk(new Date(+m[1],+m[2]-1,+m[3]));
+  m=s.match(/^(\d{1,2})[-\s\/]([A-Za-z]{3,9})[-\s\/,]+(\d{2,4})$/);   // 1-Jun-26
+  if(m){const mo=_MON[m[2].slice(0,3).toLowerCase()];if(mo!=null){let y=+m[3];if(y<100)y+=2000;return _bkMk(new Date(y,mo,+m[1]));}}
+  m=s.match(/^(\d{2})[-\s]([A-Za-z]{3,9})$/);                        // 26-Apr  (yy-MMM)
+  if(m){const mo=_MON[m[2].slice(0,3).toLowerCase()];if(mo!=null)return _bkMk(new Date(2000+ +m[1],mo,1));}
+  m=s.match(/^([A-Za-z]{3,9})[-\s,]+(\d{2,4})$/);                    // Apr-26 / April 2026
+  if(m){const mo=_MON[m[1].slice(0,3).toLowerCase()];if(mo!=null){let y=+m[2];if(y<100)y+=2000;return _bkMk(new Date(y,mo,1));}}
+  m=s.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})$/);               // 01/06/2026 (Indian D/M/Y)
+  if(m)return _bkMk(new Date(+m[3],+m[2]-1,+m[1]));
+  const ts=Date.parse(s);
+  return isNaN(ts)?null:_bkMk(new Date(ts));
+}
+function processBucket(rows){
+  if(!rows||!rows.length)return[];
+  const cols=Object.keys(rows[0]);
+  const find=(...t)=>cols.find(c=>t.some(k=>c.toLowerCase().trim().includes(k)))||null;
+  const cBM=find('booking month','booking date','booked')||cols[0];
+  const cName=find('booking name','project name','name')||cols[1];
+  const cId=find('sseid','sse id','project id')||cols[2];
+  const cIM=find('installed','install')||cols[3];
+  const normId=v=>String(v||'').toUpperCase().replace(/\s+/g,'').replace(/-/g,'_');
+  const byNorm={};projects.forEach(p=>{byNorm[normId(p.id)]=p;});
+  const seen=new Set();
+  return rows.map(r=>{
+    const rawId=String(r[cId]||'').trim();
+    if(!rawId&&!r[cName])return null;
+    const p=byNorm[normId(rawId)]||null;
+    const key=normId(rawId)||r[cName];
+    if(seen.has(key))return null;           // ignore duplicate rows of the same SSEID
+    seen.add(key);
+    return{id:rawId,name:String(r[cName]||p?.name||rawId).trim(),bm:parseBucketDate(r[cBM]),im:parseBucketDate(r[cIM]),p};
+  }).filter(Boolean);
+}
+
+function renderBucket(){
+  const all=window._bucket||[];
+  const cntEl=document.getElementById('tabCntBucket');
+  const ovCnt=document.getElementById('tabCntOverview');
+  if(ovCnt)ovCnt.textContent=projectsForMonth(selectedMonth).length;
+  const body=document.getElementById('tabBucket');if(!body)return;
+
+  // header City / Revenue type filters apply (unmatched rows only show when those filters are off)
+  const hdrOk=b=>{
+    if(selectedHdrCity==='all'&&selectedHdrRevType==='all')return true;
+    if(!b.p)return false;
+    return (selectedHdrCity==='all'||b.p.city===selectedHdrCity)&&(selectedHdrRevType==='all'||b.p.revenueType===selectedHdrRevType);
+  };
+  const scope=all.filter(hdrOk);
+  const installedAll=scope.filter(b=>b.im);
+  if(cntEl)cntEl.textContent=installedAll.length;
+
+  if(!all.length){
+    document.getElementById('bkFunnel').innerHTML='';
+    document.getElementById('bkKpis').innerHTML=`<div style="grid-column:1/-1;padding:18px;color:var(--textl)">${window._bucketLoaded===false||!window._bucketLoaded
+      ?'The “FY-26-27 bucket” sheet could not be loaded. Check that the tab name matches exactly and the sheet is published.'
+      :'The “FY-26-27 bucket” sheet has no rows yet.'}</div>`;
+    ['bkCohortTbl','bkInstTbl','bkHeatTbl','bkProjTbl'].forEach(id=>document.getElementById(id).innerHTML='');
+    document.getElementById('bkFoot').textContent='';
+    return;
+  }
+
+  // Month dropdowns
+  const bmKeys=[...new Set(scope.map(b=>b.bm?.ym).filter(Boolean))].sort();
+  const imKeys=[...new Set(installedAll.map(b=>b.im.ym))].sort();
+  const fillSel=(id,keys)=>{const el=document.getElementById(id);const cur=el.value;
+    el.innerHTML='<option value="all">All</option>'+keys.map(k=>`<option value="${k}">${ymLabel(k)}</option>`).join('');
+    el.value=keys.includes(cur)?cur:'all';};
+  fillSel('bkFltBM',bmKeys);fillSel('bkFltIM',imKeys);
+  const fBM=document.getElementById('bkFltBM').value, fIM=document.getElementById('bkFltIM').value;
+  const q=(document.getElementById('bkSearch').value||'').toLowerCase();
+
+  const cohortScope=scope.filter(b=>fBM==='all'||b.bm?.ym===fBM);
+  const inst=cohortScope.filter(b=>b.im&&(fIM==='all'||b.im.ym===fIM));
+  const booked=cohortScope.length, nInst=cohortScope.filter(b=>b.im).length, nPend=booked-nInst;
+
+  // helpers
+  const ps=list=>list.map(b=>b.p).filter(Boolean);
+  const wavg=(list,fn)=>{const v=list.filter(p=>fn(p)!=null);const r=v.reduce((s,p)=>s+p.revenue,0);return r>0?v.reduce((s,p)=>s+fn(p)*p.revenue,0)/r:null;};
+  const tat=b=>b.p&&b.p.tatDays!=null?b.p.tatDays:(b.bm&&b.im?Math.max(0,Math.round((b.im.ms-b.bm.ms)/864e5)):null);
+  const avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
+  const P1=v=>v==null?'—':(v*100).toFixed(1)+'%';
+  const dCell=v=>v==null?'<span class="neu">—</span>':`<span class="${v>0.001?'pos':v<-0.001?'neg':'neu'}">${v>=0?'+':''}${(v*100).toFixed(1)}%</span>`;
+
+  // Funnel
+  const conv=booked?nInst/booked:0;
+  document.getElementById('bkFunnel').innerHTML=`
+    <div class="bk-step"><b>${booked}</b><span>booked in bucket</span></div><span class="bk-arrow">→</span>
+    <div class="bk-step ok"><b>${nInst}</b><span>installed</span></div>
+    <div class="bk-step pend"><b>${nPend}</b><span>still to install</span></div>
+    <div class="bk-progress" title="${(conv*100).toFixed(0)}% installed"><div style="width:${(conv*100).toFixed(1)}%"></div></div>
+    <div class="bk-step"><b>${(conv*100).toFixed(0)}%</b><span>conversion</span></div>`;
+
+  // KPIs (installed projects in view)
+  const ip=ps(inst);
+  const kwp=ip.reduce((s,p)=>s+p.kwp,0), rev=ip.reduce((s,p)=>s+p.revenue,0);
+  const bkGM=wavg(ip,p=>p.bkGM), inGM=wavg(ip,p=>p.insGM), bkNM=wavg(ip,p=>p.bkNM), inNM=wavg(ip,p=>p.insNM);
+  const tats=inst.map(tat).filter(v=>v!=null);const aTat=avg(tats);
+  const unmatched=inst.filter(b=>!b.p).length;
+  const k=(l,v,s,c,badge)=>`<div class="kpi ${c||''}"><div class="kpi-lbl">${l}</div><div class="kpi-val">${v}</div><div class="kpi-sub">${s}</div>${badge||''}</div>`;
+  document.getElementById('bkKpis').innerHTML=
+    k('Installed projects',inst.length,`${unmatched?unmatched+' not found in Revenue sheet':'All matched to Revenue sheet'}`,'g')+
+    k('Installed capacity',kwp.toFixed(1)+' KWp',`Avg ${ip.length?(kwp/ip.length).toFixed(1):'—'} KWp per project`,'b')+
+    k('Revenue',fmt(rev),`₹${kwp?(rev/(kwp*1000)).toFixed(1):'—'}/W`,'')+
+    k('Booking GM → Install GM',`<span style="font-size:.82em">${P1(bkGM)} → ${P1(inGM)}</span>`,'Revenue-weighted','pu',
+      bkGM!=null&&inGM!=null?`<div class="kpi-badge ${inGM-bkGM>=0?'pos':'neg'}">${inGM-bkGM>=0?'+':''}${((inGM-bkGM)*100).toFixed(1)} pp</div>`:'')+
+    k('Install NM',P1(inNM),`Booking NM ${P1(bkNM)}`,'',
+      bkNM!=null&&inNM!=null?`<div class="kpi-badge ${inNM-bkNM>=0?'pos':'neg'}">${inNM-bkNM>=0?'+':''}${((inNM-bkNM)*100).toFixed(1)} pp</div>`:'')+
+    k('Avg booking → install',aTat!=null?Math.round(aTat)+' days':'—',tats.length?`Fastest ${Math.min(...tats)}d · slowest ${Math.max(...tats)}d`:'No dates','r');
+
+  // By booking month (cohort)
+  const cohorts={};scope.forEach(b=>{const key=b.bm?.ym||'unknown';(cohorts[key]=cohorts[key]||[]).push(b);});
+  const cKeys=Object.keys(cohorts).sort();
+  let cRows=cKeys.map(key=>{
+    const all_=cohorts[key], ins_=all_.filter(b=>b.im&&(fIM==='all'||b.im.ym===fIM));
+    const pp_=ps(ins_);const r_=pp_.reduce((s,p)=>s+p.revenue,0);
+    const bg=wavg(pp_,p=>p.bkGM),ig=wavg(pp_,p=>p.insGM),inm=wavg(pp_,p=>p.insNM);
+    const rate=all_.length?all_.filter(b=>b.im).length/all_.length:0;
+    const t=avg(ins_.map(tat).filter(v=>v!=null));
+    const sel=fBM!=='all'&&fBM===key?' style="outline:2px solid #F5A524;outline-offset:-2px"':'';
+    return`<tr${sel}><td>${key==='unknown'?'No booking month':ymLabel(key)}</td><td>${all_.length}</td><td>${ins_.length}</td>
+      <td><div class="cogs-cell"><span>${(rate*100).toFixed(0)}%</span><div class="cogs-bar"><div style="width:${rate*100}%;background:linear-gradient(90deg,#10B981,#22C08A)"></div></div></div></td>
+      <td>${pp_.reduce((s,p)=>s+p.kwp,0).toFixed(1)}</td><td>${fmt(r_)}</td><td>${P1(bg)}</td><td>${P1(ig)}</td>
+      <td>${bg!=null&&ig!=null?dCell(ig-bg):dCell(null)}</td><td>${P1(inm)}</td><td>${t!=null?Math.round(t)+'d':'—'}</td></tr>`;
+  }).join('');
+  document.getElementById('bkCohortTbl').innerHTML=`<thead><tr><th>Booking month</th><th>Booked</th><th>Installed</th><th>Install %</th><th>KWp</th><th>Revenue</th><th>Bk GM%</th><th>In GM%</th><th>Δ GM</th><th>In NM%</th><th>Avg TAT</th></tr></thead>
+    <tbody>${cRows}</tbody>
+    <tfoot><tr><td>Total</td><td>${scope.length}</td><td>${scope.filter(b=>b.im&&(fIM==='all'||b.im.ym===fIM)).length}</td>
+      <td>${scope.length?(scope.filter(b=>b.im).length/scope.length*100).toFixed(0)+'%':'—'}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr></tfoot>`;
+
+  // By installed month
+  const im={};inst.forEach(b=>{(im[b.im.ym]=im[b.im.ym]||[]).push(b);});
+  const iRows=Object.keys(im).sort().map(key=>{
+    const pp_=ps(im[key]);const bg=wavg(pp_,p=>p.bkGM),dg=wavg(pp_,p=>p.deGM),ig=wavg(pp_,p=>p.insGM),inm=wavg(pp_,p=>p.insNM);
+    return`<tr><td>${ymLabel(key)}</td><td>${im[key].length}</td><td>${pp_.reduce((s,p)=>s+p.kwp,0).toFixed(1)}</td><td>${fmt(pp_.reduce((s,p)=>s+p.revenue,0))}</td>
+      <td>${P1(bg)}</td><td>${P1(dg)}</td><td>${P1(ig)}</td><td>${bg!=null&&ig!=null?dCell(ig-bg):dCell(null)}</td><td>${P1(inm)}</td></tr>`;
+  }).join('');
+  document.getElementById('bkInstTbl').innerHTML=`<thead><tr><th>Installed month</th><th>Projects</th><th>KWp</th><th>Revenue</th><th>Bk GM%</th><th>De GM%</th><th>In GM%</th><th>Δ GM</th><th>In NM%</th></tr></thead>
+    <tbody>${iRows||'<tr><td colspan="9" style="color:var(--textl);padding:14px">No installed projects for these filters</td></tr>'}</tbody>
+    <tfoot><tr><td>Total</td><td>${inst.length}</td><td>${kwp.toFixed(1)}</td><td>${fmt(rev)}</td><td>${P1(bkGM)}</td><td>${P1(wavg(ip,p=>p.deGM))}</td><td>${P1(inGM)}</td>
+      <td>${bkGM!=null&&inGM!=null?dCell(inGM-bkGM):dCell(null)}</td><td>${P1(inNM)}</td></tr></tfoot>`;
+
+  // Heatmap booking month × installed month
+  const hm={};let hMax=0;
+  inst.forEach(b=>{const r=b.bm?.ym||'unknown',c=b.im.ym;hm[r]=hm[r]||{};hm[r][c]=(hm[r][c]||0)+1;hMax=Math.max(hMax,hm[r][c]);});
+  const hRows=Object.keys(hm).sort(), hCols=[...new Set(inst.map(b=>b.im.ym))].sort();
+  document.getElementById('bkHeatTbl').innerHTML=hRows.length?`<thead><tr><th>Booked ↓ / Installed →</th>${hCols.map(c=>`<th style="text-align:center">${ymLabel(c)}</th>`).join('')}<th style="text-align:center">Total</th></tr></thead>
+    <tbody>${hRows.map(r=>{let tot=0;return`<tr><td>${r==='unknown'?'No booking month':ymLabel(r)}</td>${hCols.map(c=>{const v=hm[r][c]||0;tot+=v;
+      const a=v?0.12+0.78*(v/hMax):0;return`<td class="hc" style="background:${v?`rgba(31,79,209,${a.toFixed(2)})`:'transparent'};color:${a>0.5?'#fff':'#0A1A3A'}">${v||''}</td>`;}).join('')}
+      <td class="hc">${tot}</td></tr>`;}).join('')}</tbody>`
+    :'<tbody><tr><td style="color:var(--textl);padding:14px">No installed projects for these filters</td></tr></tbody>';
+
+  // Project list
+  let list=inst.filter(b=>!q||b.name.toLowerCase().includes(q)||b.id.toLowerCase().includes(q))
+    .sort((a,b)=>b.im.ms-a.im.ms);
+  const mc=(v,c)=>v==null?'<span style="color:#94a3b8">—</span>':`<span style="font-weight:800;color:${v>0?c:'#E5484D'}">${(v*100).toFixed(1)}%</span>`;
+  document.getElementById('bkProjTbl').innerHTML=`<thead><tr>
+      <th>Project</th><th>Booking month</th><th>Installed on</th><th class="t-r">TAT</th><th class="t-r">KWp</th><th class="t-r">Revenue</th>
+      <th class="t-r">Bk GM%</th><th class="t-r">De GM%</th><th class="t-r">In GM%</th><th class="t-r">Δ Bk→In</th><th class="t-r">Bk NM%</th><th class="t-r">In NM%</th></tr></thead>
+    <tbody>${list.map(b=>{const p=b.p;const t=tat(b);
+      return`<tr class="bk-row" ${p?`onclick="showProjectReview('${p.id}')"`:''}>
+        <td><div class="t-name">${_esc(b.name)}</div><div class="t-id">${_esc(b.id)}${p?'':' · <span class="bk-tag">Not in Revenue sheet</span>'}</div></td>
+        <td>${b.bm?ymLabel(b.bm.ym):'—'}</td>
+        <td>${new Date(b.im.ms).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})}</td>
+        <td class="t-r">${t!=null?`<span style="font-weight:700;color:${t<=60?'var(--g)':t<=90?'#D98A0B':'var(--r)'}">${t}d</span>`:'—'}</td>
+        <td class="t-r">${p?p.kwp.toFixed(1):'—'}</td><td class="t-r">${p?fmt(p.revenue):'—'}</td>
+        <td class="t-r">${p?mc(p.bkGM,'#1F4FD1'):'—'}</td><td class="t-r">${p?mc(p.deGM,'#D98A0B'):'—'}</td><td class="t-r">${p?mc(p.insGM,'#0E9F6E'):'—'}</td>
+        <td class="t-r">${p&&p.insGM!=null?`<span style="font-weight:800;color:${p.insGM-p.bkGM>=0?'#0E9F6E':'#E5484D'}">${p.insGM-p.bkGM>=0?'+':''}${((p.insGM-p.bkGM)*100).toFixed(1)}%</span>`:'—'}</td>
+        <td class="t-r">${p?mc(p.bkNM,'#6D4AE0'):'—'}</td><td class="t-r">${p?mc(p.insNM,'#0B8A60'):'—'}</td>
+      </tr>`;}).join('')||'<tr><td colspan="12" style="color:var(--textl);padding:16px">No installed projects match these filters</td></tr>'}</tbody>`;
+  document.getElementById('bkFoot').textContent=`${list.length} installed project${list.length!==1?'s':''} shown · ${nPend} booked project${nPend!==1?'s':''} without an installed date are hidden`;
 }
 
 // ═══════════════════════════════════════════
