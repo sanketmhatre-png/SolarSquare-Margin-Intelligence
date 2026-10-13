@@ -530,6 +530,15 @@ body{font-size:13px}
 .fsel,.wf-select,select.tbl-sort{font-size:11.5px;padding:5px 26px 5px 9px}
 .flt-lbl{font-size:11px}
 .tbl-search{font-size:12px;padding:7px 12px}
+
+.bk-hero .chart-card{background:rgba(255,255,255,.72);border:1px solid #DCE8EE;box-shadow:0 1px 0 #fff inset;border-radius:18px;margin-bottom:0;padding:14px 18px;backdrop-filter:blur(6px)}
+.bk-hero .sec-hdr{margin-bottom:8px}
+
+.snap-banner{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;background:#FFF8E6;border:1px solid #F5D58A;
+  border-left:5px solid var(--sun);border-radius:14px;padding:12px 16px;margin-bottom:14px;color:#5A3B00;font-size:12.5px;line-height:1.5;box-shadow:0 3px 0 #F3E3B8}
+.snap-banner ul{margin:4px 0 4px 18px}
+.snap-hint{color:#7A5A16;font-size:12px}
+.snap-banner .btn{flex-shrink:0}
 </style>
 </head>
 <body>
@@ -613,6 +622,7 @@ body{font-size:13px}
     </div>
   </div>
 
+  <div id="snapState" style="display:none"></div>
   <div id="errState" style="display:none">
     <div class="err-banner">
       ⚠ <strong>Some sheets could not be loaded. Details are below; demo data is shown until the next refresh succeeds.</strong>
@@ -865,7 +875,17 @@ body{font-size:13px}
           </div>
         </div>
         <div class="bk-funnel" id="bkFunnel"></div>
-        <div class="kpi-grid" id="bkKpis" style="margin-bottom:0"></div>
+        <div class="kpi-grid" id="bkKpis"></div>
+        <div class="chart-card" id="bkJourneyCard">
+          <div class="sec-hdr">
+            <div><div class="sec-title">Margin stage journey · installed projects</div>
+            <div class="sec-sub" id="bkJourneyCtx">All installed projects in view</div></div>
+            <select class="wf-select" id="bkJourneySel" onchange="renderBucket()">
+              <option value="all">🌐 All installed projects</option>
+            </select>
+          </div>
+          <div class="journey-grid" id="bkJourneyGrid"></div>
+        </div>
       </section>
 
       <div class="g2">
@@ -1541,6 +1561,26 @@ function filteredCatCosts(){
 // ═══════════════════════════════════════════
 function renderJourney(id){
   const cd=getCatData(id);if(!cd)return;
+  renderJourneyInto(cd,'journeyGrid');
+  const pName=id==='__portfolio__'?'Portfolio (all projects)':
+    (projects.find(x=>x.id===id)||{name:id}).name;
+  document.getElementById('journeyCtx').textContent=pName;
+}
+// Aggregates category costs for any list of projects (same maths as the portfolio journey)
+function aggCatData(list){
+  let bk={},bm={},gn={},totalRev=0,totalBkCOGS=0,totalBkOPEX=0,totalInsOpex=0;
+  list.forEach(p=>{
+    const cd=projCatData[p.id];if(!cd)return;
+    totalRev+=p.revenue;totalBkCOGS+=p.bkCOGS;totalBkOPEX+=p.bkOPEX;totalInsOpex+=(cd.insOpex||0);
+    STD_CATS.forEach(cat=>{
+      bk[cat]=(bk[cat]||0)+(cd.bk[cat]||0);
+      bm[cat]=(bm[cat]||0)+(cd.bm[cat]||0);
+      gn[cat]=(gn[cat]||0)+(cd.gn[cat]||0);
+    });
+  });
+  return{bk,bm,gn,revenue:totalRev,bkCOGS:totalBkCOGS,bkOPEX:totalBkOPEX,insOpex:totalInsOpex};
+}
+function renderJourneyInto(cd,gridId){
   const rv=cd.revenue;
   const bkGM=(rv-cd.bkCOGS)/rv;
   const bkNM=(rv-cd.bkCOGS-cd.bkOPEX)/rv;
@@ -1560,7 +1600,7 @@ function renderJourney(id){
     return`<span class="journey-delta ${cls}">${pp(d)} GM</span>`;
   }
 
-  document.getElementById('journeyGrid').innerHTML=`
+  document.getElementById(gridId).innerHTML=`
     <div class="journey-stage bk">
       <div class="journey-icon">📋</div>
       <div class="journey-title">Booking</div>
@@ -1588,10 +1628,6 @@ function renderJourney(id){
       </div>
       ${insOpex>0?`<div class="journey-opex">Install opex ${fmt(insOpex)}</div>`:''}
     </div>`;
-
-  const pName=id==='__portfolio__'?'Portfolio (all projects)':
-    (projects.find(x=>x.id===id)||{name:id}).name;
-  document.getElementById('journeyCtx').textContent=pName;
 }
 
 // ═══════════════════════════════════════════
@@ -2599,15 +2635,57 @@ function populateSel(){
 }
 
 // ═══════════════════════════════════════════
-// LOAD — sequential per-sheet with progress
+// LAST-GOOD SNAPSHOT — keeps the dashboard steady when the sheet is filtered or a tab fails
+// Stored in this browser (IndexedDB). A refresh only replaces it when every sheet looks complete.
 // ═══════════════════════════════════════════
-async function loadData(){
+const SNAP_SHRINK_LIMIT=0.8;   // a sheet returning <80% of last refresh's rows is treated as filtered
+const CORE_SHEETS=['Revenue','Booking','BOM','GRN','Install opex'];
+const SnapDB={
+  _open(){
+    return new Promise((res,rej)=>{
+      if(!window.indexedDB)return rej(new Error('IndexedDB unavailable'));
+      const r=indexedDB.open('ssMarginSnapshot',1);
+      r.onupgradeneeded=()=>r.result.createObjectStore('kv');
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>rej(r.error);
+    });
+  },
+  async get(k){
+    try{const db=await this._open();
+      return await new Promise(res=>{const q=db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null);});
+    }catch(e){return null;}
+  },
+  async set(k,v){
+    try{const db=await this._open();
+      return await new Promise(res=>{const tx=db.transaction('kv','readwrite');tx.objectStore('kv').put(v,k);tx.oncomplete=()=>res(true);tx.onerror=()=>res(false);tx.onabort=()=>res(false);});
+    }catch(e){return false;}
+  }
+};
+const _fmtWhen=ms=>new Date(ms).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+function showSnapNotice(snap,reasons){
+  const el=document.getElementById('snapState');
+  if(!snap){el.style.display='none';el.innerHTML='';return;}
+  el.innerHTML=`<div class="snap-banner">
+    <div><b>📌 Showing the last good data, saved ${_fmtWhen(snap.savedAt)}.</b>
+      The live Google Sheet was not used because:
+      <ul>${reasons.map(r=>`<li>${r}</li>`).join('')}</ul>
+      <span class="snap-hint">If someone applied a filter in the sheet, ask them to clear it (or use Data → Filter views, which doesn't affect the dashboard) and press Refresh.</span>
+    </div>
+    <button class="btn btn-ghost" onclick="loadData({force:true})" title="Use whatever the sheet returns right now">Load live data anyway</button>
+  </div>`;
+  el.style.display='block';
+}
+
+async function loadData(opts){
+  const force=!!(opts&&opts.force);
   const btn=document.getElementById('refreshBtn');
   const status=document.getElementById('statusLine');
   btn.disabled=true; btn.textContent='⏳ Loading';
   document.getElementById('loadingState').style.display='flex';
   document.getElementById('appContent').style.display='none';
   document.getElementById('errState').style.display='none';
+  showSnapNotice(null);
   status.textContent='Connecting to Google Sheets…';
 
   const stepLabels={
@@ -2621,55 +2699,89 @@ async function loadData(){
   };
   Object.keys(stepLabels).forEach(k=>setStep(k,'pending',stepLabels[k]));
 
-  const sheets={};
   const sheetKeys=['Revenue','Booking','BOM','GRN','Install opex','FY-26-27 bucket'];
-  let anyFailed=false,errMsgs=[];
-
+  const live={},failed=[],errMsgs=[];
   for(const key of sheetKeys){
     setStep(key,'active',`Loading ${stepLabels[key]}…`);
     status.textContent=`Loading ${key} sheet…`;
     try{
-      sheets[key]=await fetchSheet(key);
-      setStep(key,'done',`${stepLabels[key]} — ${sheets[key].length} rows ✓`);
+      live[key]=await fetchSheet(key);
+      setStep(key,'done',`${stepLabels[key]} — ${live[key].length} rows ✓`);
     }catch(e){
+      failed.push(key);errMsgs.push(`${key}: ${e.message}`);
       setStep(key,'error',`${key}: ${e.message}`);
-      anyFailed=true;
-      errMsgs.push(`${key}: ${e.message}`);
       console.error(e);
-      if(key==='Revenue'||key==='Booking'){
-        setStep('Process','error','Cannot continue without Revenue & Booking sheets');
-        document.getElementById('errDetail').textContent=errMsgs.join('\n')+'\n\nFalling back to demo data.';
-        document.getElementById('errState').style.display='block';
-        status.textContent='⚠ Demo data';
-        await new Promise(r=>setTimeout(r,800));
-        document.getElementById('loadingState').style.display='none';
-        document.getElementById('appContent').style.display='block';
-        btn.disabled=false; btn.textContent='🔄 Refresh';
-        loadDemoData();
-        return;
-      }
     }
   }
 
-  setStep('Process','active','Computing margins for all projects…');
+  // Compare with the last good snapshot
+  const snap=await SnapDB.get('snapshot');
+  const reasons=[];
+  if(snap&&!force){
+    sheetKeys.forEach(k=>{
+      const was=snap.counts?.[k]||0;
+      if(failed.includes(k)){
+        if(was)reasons.push(`<b>${k}</b> sheet could not be loaded.`);
+        return;
+      }
+      const now=live[k]?.length||0;
+      if(was>=10&&now<was*SNAP_SHRINK_LIMIT){
+        reasons.push(`<b>${k}</b> sheet returned only ${now} rows (last good refresh had ${was}) — it looks filtered.`);
+        setStep(k,'error',`${stepLabels[k]} — only ${now} of ${was} rows, looks filtered`);
+      }
+    });
+  }
+  const useSnap=!!(snap&&!force&&reasons.length);
+  const data=useSnap?snap.sheets:live;
+
+  // No snapshot to fall back on and a critical sheet is missing → demo data (as before)
+  if(!useSnap&&(failed.includes('Revenue')||failed.includes('Booking'))){
+    setStep('Process','error','Cannot continue without Revenue & Booking sheets');
+    document.getElementById('errDetail').textContent=errMsgs.join('\n')+'\n\nFalling back to demo data.';
+    document.getElementById('errState').style.display='block';
+    status.textContent='⚠ Demo data';
+    document.getElementById('loadingState').style.display='none';
+    document.getElementById('appContent').style.display='block';
+    btn.disabled=false; btn.textContent='🔄 Refresh';
+    loadDemoData();
+    return;
+  }
+
+  setStep('Process','active',useSnap?'Using last good snapshot…':'Computing margins for all projects…');
   status.textContent='Processing…';
   try{
-    await new Promise(r=>setTimeout(r,100));
-    projects=processData(sheets.Revenue,sheets.Booking,sheets.BOM||[],sheets.GRN||[],sheets['Install opex']||[]);
+    await new Promise(r=>setTimeout(r,60));
+    projects=processData(data.Revenue,data.Booking,data.BOM||[],data.GRN||[],data['Install opex']||[]);
     if(!projects.length) throw new Error('No matching project data (check SSEID values in Revenue sheet)');
-    window._bucket=processBucket(sheets['FY-26-27 bucket']||[]);
-    window._bucketLoaded=!!sheets['FY-26-27 bucket'];
-    setStep('Process','done',`✓ ${projects.length} projects computed`);
-    // Show content before rendering so charts measure their real size
+    window._bucket=processBucket(data['FY-26-27 bucket']||[]);
+    window._bucketLoaded=!!data['FY-26-27 bucket'];
+    setStep('Process','done',`✓ ${projects.length} projects computed${useSnap?' (from snapshot)':''}`);
+
+    // Save a new snapshot only when every core sheet came back complete
+    let saved=false;
+    if(!useSnap&&!CORE_SHEETS.some(k=>failed.includes(k))){
+      const counts={};sheetKeys.forEach(k=>{if(live[k])counts[k]=live[k].length;});
+      const sheetsToSave={...live};
+      // keep the previous bucket tab if only that one failed
+      if(failed.includes('FY-26-27 bucket')&&snap?.sheets?.['FY-26-27 bucket']){
+        sheetsToSave['FY-26-27 bucket']=snap.sheets['FY-26-27 bucket'];counts['FY-26-27 bucket']=snap.counts['FY-26-27 bucket'];
+      }
+      saved=await SnapDB.set('snapshot',{savedAt:Date.now(),sheets:sheetsToSave,counts});
+    }
+
     document.getElementById('loadingState').style.display='none';
     document.getElementById('appContent').style.display='block';
     renderAll();
-    if(anyFailed){
+
+    if(useSnap){
+      showSnapNotice(snap,reasons);
+      status.textContent=`📌 Snapshot · ${projects.length} projects · saved ${_fmtWhen(snap.savedAt)}`;
+    }else if(failed.length){
       document.getElementById('errDetail').textContent='Partial data: some sheets failed.\n'+errMsgs.join('\n');
       document.getElementById('errState').style.display='block';
       status.textContent=`⚠ Partial · ${projects.length} projects · ${new Date().toLocaleTimeString()}`;
     }else{
-      status.textContent=`Live · ${projects.length} projects · ${new Date().toLocaleTimeString()}`;
+      status.textContent=`Live · ${projects.length} projects · ${new Date().toLocaleTimeString()}${saved?' · snapshot saved':''}`;
     }
   }catch(e){
     setStep('Process','error','Processing failed: '+e.message);
@@ -3661,7 +3773,7 @@ function renderBucket(){
     document.getElementById('bkKpis').innerHTML=`<div style="grid-column:1/-1;padding:18px;color:var(--textl)">${window._bucketLoaded===false||!window._bucketLoaded
       ?'The “FY-26-27 bucket” sheet could not be loaded. Check that the tab name matches exactly and the sheet is published.'
       :'The “FY-26-27 bucket” sheet has no rows yet.'}</div>`;
-    ['bkCohortTbl','bkInstTbl','bkHeatTbl','bkProjTbl'].forEach(id=>document.getElementById(id).innerHTML='');
+    ['bkCohortTbl','bkInstTbl','bkHeatTbl','bkProjTbl','bkJourneyGrid'].forEach(id=>document.getElementById(id).innerHTML='');
     document.getElementById('bkFoot').textContent='';
     return;
   }
@@ -3713,6 +3825,28 @@ function renderBucket(){
     k('Install NM',P1(inNM),`Booking NM ${P1(bkNM)}`,'',
       bkNM!=null&&inNM!=null?`<div class="kpi-badge ${inNM-bkNM>=0?'pos':'neg'}">${inNM-bkNM>=0?'+':''}${((inNM-bkNM)*100).toFixed(1)} pp</div>`:'')+
     k('Avg booking → install',aTat!=null?Math.round(aTat)+' days':'—',tats.length?`Fastest ${Math.min(...tats)}d · slowest ${Math.max(...tats)}d`:'No dates','r');
+
+  // Margin stage journey for installed projects (all, or one picked project)
+  {
+    const sel=document.getElementById('bkJourneySel');
+    const cur=sel.value;
+    const opts=[...ip].sort((a,b)=>a.name.localeCompare(b.name));
+    sel.innerHTML=`<option value="all">🌐 All installed projects (${ip.length})</option>`+
+      opts.map(p=>`<option value="${p.id}">${_esc(p.name)}  (${p.kwp} KWp)</option>`).join('');
+    sel.value=opts.some(p=>p.id===cur)?cur:'all';
+    const jList=sel.value==='all'?ip:ip.filter(p=>p.id===sel.value);
+    const cd=aggCatData(jList);
+    const ctx=document.getElementById('bkJourneyCtx');
+    if(jList.length&&cd.revenue>0){
+      renderJourneyInto(cd,'bkJourneyGrid');
+      ctx.textContent=sel.value==='all'
+        ?`${jList.length} installed project${jList.length!==1?'s':''} · ${fmt(cd.revenue)} revenue${fBM!=='all'?' · booked '+ymLabel(fBM):''}${fIM!=='all'?' · installed '+ymLabel(fIM):''}`
+        :`${jList[0].name} · ${jList[0].id}`;
+    }else{
+      document.getElementById('bkJourneyGrid').innerHTML='<div style="grid-column:1/-1;padding:14px;color:var(--textl)">No installed projects with revenue data for these filters.</div>';
+      ctx.textContent='';
+    }
+  }
 
   // By booking month (cohort)
   const cohorts={};scope.forEach(b=>{const key=b.bm?.ym||'unknown';(cohorts[key]=cohorts[key]||[]).push(b);});
